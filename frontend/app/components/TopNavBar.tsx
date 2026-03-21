@@ -1,3 +1,5 @@
+import WalletConnectComp from "./WalletConnectComp";
+
 export default function TopNavBar() {
   return (
     <header className="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-14 bg-[#111417] border-none">
@@ -7,6 +9,7 @@ export default function TopNavBar() {
         </span>
       </div>
       <div className="flex items-center gap-4">
+        <WalletConnectComp />
         <div className="bg-surface-container-low px-3 py-1.5 flex items-center gap-2">
           <span className="material-symbols-outlined text-sm text-outline">
             search
