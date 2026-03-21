@@ -307,12 +307,36 @@ function forceLayout(
   }
 
   const REPULSION = 80_000;      // repulsion strength
-  const SPRING_K = 0.008;        // edge spring stiffness
-  const SPRING_LEN = 350;        // ideal edge length
+  const SPRING_K_BASE = 0.006;   // base edge spring stiffness
+  const SPRING_LEN_MAX = 450;    // ideal length for weakest edge
+  const SPRING_LEN_MIN = 120;    // ideal length for strongest edge
   const GRAVITY = 0.002;         // pull toward center
   const DAMPING = 0.92;          // velocity damping
   const MIN_DIST = 20;           // avoid division by zero
   const MAX_FORCE = 60;          // clamp per-axis force
+
+  // Compute max weight across all edges for normalisation
+  let maxWeight = 1;
+  for (const e of edges) {
+    const tx = (e.data?.txCount ?? 1) as number;
+    const vol = (e.data?.volumeTON ?? 0) as number;
+    const w = tx + vol * 0.5;
+    if (w > maxWeight) maxWeight = w;
+  }
+  // Build per-edge weight lookup (source|target -> { springLen, springK })
+  const edgeParams: Record<string, { springLen: number; springK: number }> = {};
+  for (const e of edges) {
+    const tx = (e.data?.txCount ?? 1) as number;
+    const vol = (e.data?.volumeTON ?? 0) as number;
+    const w = tx + vol * 0.5;
+    const ratio = w / maxWeight;  // 0..1 (1 = strongest relationship)
+    const springLen = SPRING_LEN_MAX - ratio * (SPRING_LEN_MAX - SPRING_LEN_MIN);
+    const springK = SPRING_K_BASE * (1 + ratio * 3); // stronger pull for closer wallets
+    const key1 = `${e.source}|${e.target}`;
+    const key2 = `${e.target}|${e.source}`;
+    edgeParams[key1] = { springLen, springK };
+    edgeParams[key2] = { springLen, springK };
+  }
 
   const vel: Record<string, Vec> = {};
   for (const id of ids) vel[id] = { x: 0, y: 0 };
@@ -343,7 +367,7 @@ function forceLayout(
       }
     }
 
-    // 2. Edge springs
+    // 2. Edge springs (weighted: closer relationship → shorter spring)
     for (const e of edges) {
       const a = e.source as string;
       const b = e.target as string;
@@ -351,8 +375,9 @@ function forceLayout(
       const dx = pos[b].x - pos[a].x;
       const dy = pos[b].y - pos[a].y;
       const dist = Math.sqrt(dx * dx + dy * dy) || MIN_DIST;
-      const displacement = dist - SPRING_LEN;
-      const f = SPRING_K * displacement;
+      const params = edgeParams[`${a}|${b}`] ?? { springLen: SPRING_LEN_MAX, springK: SPRING_K_BASE };
+      const displacement = dist - params.springLen;
+      const f = params.springK * displacement;
       const fx = (dx / dist) * f;
       const fy = (dy / dist) * f;
       forces[a].x += fx; forces[a].y += fy;
@@ -479,6 +504,7 @@ export default function BubbleMap({
         type: 'circle',
         animated: true,
         label,
+        data: { txCount: cp.txCount, volumeTON: nanoToTON(cp.sentNano + cp.receivedNano) },
         style: { stroke: color, strokeWidth: 2.5 },
         markerEnd: {
           type: MarkerType.Arrow,
