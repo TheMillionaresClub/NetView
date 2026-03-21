@@ -1,169 +1,123 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   useNodesState,
-  useEdgesState,
   Handle,
   Position,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css"; // Indispensable !
+import "@xyflow/react/dist/style.css";
 
-// --- 1. TON DESIGN DE BULLE (Custom Node) ---
-// React Flow va utiliser ça pour dessiner chaque bulle avec tes classes Tailwind
-const CryptoNode = ({ data }: { data: any }) => {
+// --- 1. LES MATHS POUR LA TAILLE ---
+const calculateRadius = (volume: number) => {
+  const MIN_RADIUS = 30;  // Taille minimale pour les petits portefeuilles
+  const MAX_RADIUS = 120; // Le fameux CAP maximal pour ne pas casser l'écran
+
+  // On utilise la racine carrée pour que l'aire soit proportionnelle au volume
+  // Le multiplicateur (0.15) est à ajuster selon si tes volumes sont énormes ou petits
+  const rawRadius = Math.sqrt(volume) * 0.15; 
+
+  // On s'assure que le rayon reste entre MIN_RADIUS et MAX_RADIUS
+  return Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, rawRadius));
+};
+
+// --- 2. LE DESIGN DE LA PERSONNE (Custom Node) ---
+const PersonNode = ({ data }: { data: any }) => {
+  const radius = data.radius;
+
+  // On passe sur des couleurs Tailwind pures avec des fonds sombres (900/40) 
+  // et des bordures vives (400) pour un contraste parfait.
+  const getTheme = (type: string) => {
+    switch(type) {
+      case 'whale': 
+        return 'bg-purple-900/60 border-purple-400 text-purple-50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:bg-purple-800/80';
+      case 'trader': 
+        return 'bg-blue-900/60 border-blue-400 text-blue-50 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:bg-blue-800/80';
+      case 'degen': 
+        return 'bg-green-900/60 border-green-400 text-green-50 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:bg-green-800/80';
+      case 'primary': 
+        return 'bg-orange-900/60 border-orange-400 text-orange-50 shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:bg-orange-800/80';
+      default: 
+        return 'bg-slate-800/60 border-slate-400 text-slate-50 shadow-sm hover:bg-slate-700/80';
+    }
+  };
+
   return (
-    <div className="relative group cursor-pointer flex flex-col items-center justify-center">
-      {/* Handles cachés pour que les lignes puissent s'accrocher au centre */}
-      <Handle type="target" position={Position.Top} className="opacity-0 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
-      <Handle type="source" position={Position.Bottom} className="opacity-0 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+    <div
+      className={`relative flex flex-col items-center justify-center rounded-full border-2 backdrop-blur-sm transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden ${getTheme(data.raw.type)}`}
+      style={{
+        width: radius * 2,
+        height: radius * 2,
+      }}
+    >
+      {/* On limite la taille du texte et on force la coupure avec 'truncate' si le nom est trop long */}
+      <span className="font-bold text-xs sm:text-sm text-center px-3 w-full truncate drop-shadow-md">
+        {data.name}
+      </span>
       
-      {/* Ta boîte personnalisée */}
-      <div className={data.boxClass}>
-        <span className={`material-symbols-outlined ${data.iconClass}`} style={data.iconStyle}>
-          {data.icon}
-        </span>
-      </div>
-      
-      {/* Ton label */}
-      {data.label && <div className={data.labelClass}>{data.label}</div>}
+      {/* Le montant en plus petit, bien centré */}
+      <span className="text-[10px] sm:text-xs opacity-90 font-mono mt-1 font-semibold tracking-wider">
+        ${data.volume >= 1000 ? (data.volume / 1000).toFixed(1) + "k" : data.volume}
+      </span>
+
+      {/* Handles cachés pour React Flow */}
+      <Handle type="target" position={Position.Top} className="opacity-0" />
+      <Handle type="source" position={Position.Bottom} className="opacity-0" />
     </div>
   );
 };
 
-// --- 2. TES DONNÉES CONVERTIES ---
-// J'ai transformé tes % en coordonnées x,y arbitraires. Tu pourras les ajuster !
-const initialNodes = [
-  {
-    id: "center",
-    type: "crypto",
-    position: { x: 400, y: 300 }, // C'était ton 50% 50%
-    data: {
-      icon: "account_balance_wallet",
-      label: "0x...1234 (PRIMARY)",
-      boxClass: "w-24 h-24 bg-primary-container border-4 border-surface shadow-[0_0_40px_rgba(0,229,255,0.4)] flex items-center justify-center rounded-lg",
-      iconClass: "text-on-primary-container text-4xl",
-      iconStyle: { fontVariationSettings: "'FILL' 1" },
-      labelClass: "absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface px-2 py-1 text-[10px] font-headline tracking-tighter border border-outline-variant",
-    },
-    zIndex: 10, // Ton zClass
-  },
-  {
-    id: "cex",
-    type: "crypto",
-    position: { x: 200, y: 150 }, // 30% 30%
-    data: {
-      icon: "account_balance",
-      label: "BINANCE_HOT",
-      boxClass: "w-16 h-16 bg-secondary border-4 border-surface shadow-[0_0_20px_rgba(73,215,244,0.3)] flex items-center justify-center rounded-lg",
-      iconClass: "text-on-secondary text-2xl",
-      labelClass: "absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface-container-high px-2 py-0.5 text-[9px] font-headline",
-    },
-  },
-  {
-    id: "whale",
-    type: "crypto",
-    position: { x: 600, y: 200 }, // 70% 40%
-    data: {
-      icon: "water_drop",
-      label: "WHALE_09",
-      boxClass: "w-20 h-20 bg-primary border-4 border-surface shadow-[0_0_25px_rgba(195,245,255,0.3)] flex items-center justify-center rounded-lg",
-      iconClass: "text-on-primary text-3xl",
-      iconStyle: { fontVariationSettings: "'FILL' 1" },
-      labelClass: "absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface-container-high px-2 py-0.5 text-[9px] font-headline",
-    },
-  },
-  {
-    id: "dex",
-    type: "crypto",
-    position: { x: 500, y: 450 }, // 60% 75%
-    data: {
-      icon: "swap_horiz",
-      label: "UNISWAP_V3",
-      boxClass: "w-14 h-14 bg-tertiary-container border-4 border-surface shadow-[0_0_20px_rgba(251,187,255,0.3)] flex items-center justify-center rounded-lg",
-      iconClass: "text-on-tertiary-container text-xl",
-      labelClass: "absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface-container-high px-2 py-0.5 text-[9px] font-headline",
-    },
-  },
-  {
-    id: "user",
-    type: "crypto",
-    position: { x: 150, y: 400 }, // 25% 65%
-    data: {
-      icon: "person",
-      boxClass: "w-10 h-10 bg-surface-variant border-2 border-surface flex items-center justify-center rounded-lg",
-      iconClass: "text-on-surface-variant text-base",
-    },
-  },
-  {
-    id: "contract",
-    type: "crypto",
-    position: { x: 350, y: 100 }, // 45% 20%
-    data: {
-      icon: "terminal",
-      boxClass: "w-12 h-12 bg-transparent border-2 border-outline flex items-center justify-center rounded-lg",
-      iconClass: "text-outline text-lg",
-    },
-  },
-];
-
-// --- 3. TES CONNEXIONS (Edges) ---
-// React Flow relie les IDs entre eux. J'ai ajouté le paramètre `animated: true` pour le style !
-const initialEdges = [
-  { id: "e-center-cex", source: "center", target: "cex", animated: true, style: { stroke: "#00e5ff", strokeWidth: 2 } },
-  { id: "e-center-whale", source: "center", target: "whale", animated: true, style: { stroke: "#00e5ff", strokeWidth: 2 } },
-  { id: "e-center-dex", source: "center", target: "dex", animated: true, style: { stroke: "#00e5ff", strokeWidth: 2 } },
-  { id: "e-center-user", source: "center", target: "user", animated: true, style: { stroke: "#00e5ff", strokeWidth: 2 } },
-  { id: "e-center-contract", source: "center", target: "contract", animated: true, style: { stroke: "#00e5ff", strokeWidth: 2 } },
-];
-
-const legend = [
-  { color: "bg-secondary", label: "CEX" },
-  { color: "bg-primary", label: "WHALE" },
-  { color: "bg-tertiary-container", label: "DEX" },
-];
-
-// --- 4. LE COMPOSANT PRINCIPAL ---
+// --- 3. LE COMPOSANT PRINCIPAL ---
 export default function BubbleMap() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  
-  // On enregistre notre design pour que React Flow l'utilise
-  const nodeTypes = useMemo(() => ({ crypto: CryptoNode }), []);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
+
+  useEffect(() => {
+    fetch("/data.json")
+      .then((res) => res.json())
+      .then((data) => {
+        // On transforme le JSON en "Nodes" compréhensibles par React Flow
+        const newNodes = data.map((person: any, index: number) => {
+          const r = calculateRadius(person.totalVolume);
+          
+          // Génération de positions pour éparpiller les bulles sur l'écran
+          // On fait une petite grille mathématique dynamique
+          const x = (index % 3) * 300 + Math.random() * 50;
+          const y = Math.floor(index / 3) * 250 + Math.random() * 50;
+
+          return {
+            id: person.id,
+            type: "person",
+            position: { x, y },
+            data: {
+              name: person.name,
+              volume: person.totalVolume,
+              radius: r,
+              raw: person, // On garde toutes les infos (tokens, transactions) pour le futur panneau de détails !
+            },
+          };
+        });
+
+        setNodes(newNodes);
+      });
+  }, [setNodes]);
 
   return (
-    // J'ai gardé tes classes pour le placement exact sur l'écran
     <main className="fixed left-20 right-80 top-14 bottom-0 bg-surface-container-lowest grid-bg overflow-hidden">
-      
       <ReactFlow
         nodes={nodes}
-        edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        fitView // Va centrer automatiquement tout ton graphe à l'ouverture
-        minZoom={0.5}
+        fitView
+        minZoom={0.2}
         maxZoom={2}
       >
-        {/* Un fond plus interactif que le grid statique */}
         <Background color="#374151" gap={20} size={1} />
         <Controls className="fill-white" />
       </ReactFlow>
-
-      {/* Ta légende flottante reste exactement au même endroit */}
-      <div className="absolute bottom-6 left-6 flex gap-4 pointer-events-none z-50">
-        {legend.map((item) => (
-          <div key={item.label} className="flex items-center gap-2">
-            <div className={`w-2 h-2 ${item.color}`} />
-            <span className="text-[9px] font-headline tracking-widest text-outline uppercase">
-              {item.label}
-            </span>
-          </div>
-        ))}
-      </div>
     </main>
   );
 }
