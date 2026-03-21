@@ -3,4 +3,4 @@
 
 export function get_address_information(address: string): Promise<string>;
 
-export function get_transactions(address: string, limit: number): Promise<any>;
+export function get_transactions(address: string, limit: number, api_key?: string | null): Promise<any>;

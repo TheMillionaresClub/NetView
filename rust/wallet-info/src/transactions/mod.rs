@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::transactions::types::RpcResponse;
+use crate::transactions::types::{ExtTransaction, RpcResponse};
 
 pub mod types;
 
@@ -9,7 +9,7 @@ pub enum Action {
     Receive,
     Send,
 }
- 
+
 #[derive(Debug, Serialize)]
 pub struct Transaction {
     /// The other party — sender on Receive, recipient on Send.
@@ -21,9 +21,13 @@ pub struct Transaction {
 }
 
 pub fn extract_transactions(rpc: &RpcResponse) -> Vec<Transaction> {
+    extract_transactions_from_slice(&rpc.result)
+}
+
+pub fn extract_transactions_from_slice(ext_txs: &[ExtTransaction]) -> Vec<Transaction> {
     let mut txs = Vec::new();
 
-    for ext_tx in &rpc.result {
+    for ext_tx in ext_txs {
         let ts  = ext_tx.utime;
         let fee = ext_tx.fee;
 

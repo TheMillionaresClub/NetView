@@ -30,8 +30,8 @@ pub async fn get_address_information(address: String) -> Result<String, JsValue>
 }
 
 #[wasm_bindgen]
-pub async fn get_transactions(address: String, limit: u32) -> Result<JsValue, JsValue> {
-    match transactions(&CLIENT, &NETWORK, &address, limit).await {
+pub async fn get_transactions(address: String, limit: u32, api_key: Option<String>) -> Result<JsValue, JsValue> {
+    match transactions(&CLIENT, &NETWORK, &address, limit, api_key.as_deref()).await {
         Ok(transactions) => Ok(serde_wasm_bindgen::to_value(&transactions)?),
         Err(e) => Err(serde_wasm_bindgen::to_value(&json!{{"error": e.to_string()}})?)
     }
