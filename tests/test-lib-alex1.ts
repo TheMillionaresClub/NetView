@@ -1,13 +1,13 @@
-import init, { get_address_information_json } from "ton_explorer_core";
+import { get_address_information } from "wallet-info";
 
 async function main() {
-  // First, ensure WASM is initialized (some bundlers call default export automatically; if not, call init())
-  await init();
-
   const address = "0QD6a-uyjiAX8gRmtPi2ztdeBEliw6GrBa6dQBeM8wlQfJ5K";
-  const apiKey = "e251fe96771c8fe3e7c93798924a1b12c600aecfcc25d4b9fa9178ca15a9050d";
 
-  const info = await get_address_information_json(address, apiKey);
-  // info is a JS object matching AddressInformation
-  console.log(info.balance, info.status);
+  const info = await get_address_information(address);
+  // info is a JSON string — parse it
+  const parsed = JSON.parse(info);
+  console.log("Balance:", parsed.balance, "Status:", parsed.status);
+  console.log("Full response:", JSON.stringify(parsed, null, 2));
 }
+
+main().catch(console.error);
