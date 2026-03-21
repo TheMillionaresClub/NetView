@@ -101,6 +101,29 @@ const PersonNode = ({ data }: { data: NodeData }) => {
 };
 
 /* ════════════════════════════════════════════════════════
+   LOCAL STORAGE PERSISTENCE
+════════════════════════════════════════════════════════ */
+const LS_KEY = "bubblemap-state";
+
+function loadSaved(): { nodePositions: Record<string, { x: number; y: number }>; edges: any[]; unlockedWallets: string[] } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveToStorage(nodes: any[], edges: any[], unlockedWallets: string[]) {
+  try {
+    const nodePositions: Record<string, { x: number; y: number }> = {};
+    for (const n of nodes) {
+      nodePositions[n.id] = n.position;
+    }
+    localStorage.setItem(LS_KEY, JSON.stringify({ nodePositions, edges, unlockedWallets }));
+  } catch { /* quota exceeded — ignore */ }
+}
+
+/* ════════════════════════════════════════════════════════
    BUBBLE MAP
 ════════════════════════════════════════════════════════ */
 export default function BubbleMap({ 
@@ -116,7 +139,9 @@ export default function BubbleMap({
   const [selected, setSelected]          = useState<WalletData | null>(null);
   
   const [allWalletsDb, setAllWalletsDb]  = useState<WalletData[]>([]);
-  const [unlockedWallets, setUnlockedWallets] = useState<string[]>([]);
+
+  const saved = useMemo(() => loadSaved(), []);
+  const [unlockedWallets, setUnlockedWallets] = useState<string[]>(saved?.unlockedWallets ?? []);
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const [tonConnectUI] = useTonConnectUI();
