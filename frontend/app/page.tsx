@@ -1,18 +1,24 @@
+"use client";
+
+import { useState } from "react";
 import TopNavBar from "./components/TopNavBar";
 import SideNavBar from "./components/SideNavBar";
 import BubbleMap from "./components/BubbleMap";
-import DetailPanel from "./components/DetailsPanel";
 import BottomBar from "./components/BottomBar";
 import TonWalletComp from "./components/TonWalletComp";
 
 export default function Home() {
+  // 🆕 NOUVEAU : On stocke la recherche ici au plus haut niveau !
+  const [searchTerm, setSearchTerm] = useState("");
+
   return (
     <>
-      <TopNavBar />
+      <TopNavBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       <SideNavBar />
-      <BubbleMap />
-      <DetailPanel />
+      {/* On passe la recherche et la fonction pour la vider à la map */}
+      <BubbleMap searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       <BottomBar />
+      
       {/* TON Wallet floating widget */}
       <div className="fixed top-16 left-24 z-50">
         <TonWalletComp />

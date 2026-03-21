@@ -1,7 +1,14 @@
 import Image from "next/image";
 import TonWalletComp from "./TonWalletComp";
 
-export default function TopNavBar() {
+// 🆕 NOUVEAU : On récupère les props envoyées par page.tsx
+export default function TopNavBar({ 
+  searchTerm, 
+  setSearchTerm 
+}: { 
+  searchTerm: string; 
+  setSearchTerm: (val: string) => void; 
+}) {
   return (
     <header className="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-14 bg-[#111417] border-none">
       <div className="flex items-center gap-2">
@@ -20,6 +27,9 @@ export default function TopNavBar() {
             className="bg-transparent border-none text-xs font-headline tracking-widest focus:ring-0 w-32 md:w-64 uppercase text-on-surface-variant placeholder:text-on-surface-variant/50 outline-none"
             placeholder="SEARCH WALLET..."
             type="text"
+            // 🆕 NOUVEAU : On relie l'input au state
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <button className="text-[#94a3b8] hover:bg-[#272A2E] transition-colors duration-150 ease-linear p-2">
