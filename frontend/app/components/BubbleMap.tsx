@@ -214,76 +214,62 @@ export default function BubbleMap({
     }
   };
 
-  /* ── 3. GÉNÉRATION DES LIENS (Anti-Overlap & Bidirectionnel) ── */
+  /* ── 3. GÉNÉRATION DES LIENS (Full Network) ── */
   const generateMockEdges = (wallet: WalletData) => {
-    // 1. On récupère TOUTES les transactions entre lui et nous
-    const myTxs = wallet.recentTransactions?.filter((tx: any) => tx.with === "me") || [];
+    const txs = wallet.recentTransactions || [];
+    if (txs.length === 0) return [];
 
-    if (myTxs.length === 0) return [];
-
-    let totalSent = 0;
-    let totalReceived = 0;
-    let tokenStr = "TON";
-
-    // 2. On fait la somme des flux
-    myTxs.forEach((tx: any) => {
-      if (tx.action === "SEND") totalSent += tx.amount;
-      if (tx.action === "RECEIVE") totalReceived += tx.amount;
-      tokenStr = tx.token; // On suppose que c'est le même token pour simplifier
+    // On regroupe les transactions par destinataire ("with")
+    const groupedByTarget: Record<string, any[]> = {};
+    txs.forEach(tx => {
+      const targetId = tx.with === "me" ? "me" : tx.with;
+      if (!groupedByTarget[targetId]) groupedByTarget[targetId] = [];
+      groupedByTarget[targetId].push(tx);
     });
 
-    const isBidirectional = totalSent > 0 && totalReceived > 0;
-    const isSendingOnly = totalSent > 0 && totalReceived === 0;
+    // Pour chaque personne dans son historique, on crée UN lien
+    const newEdges = Object.keys(groupedByTarget).map(targetId => {
+      const targetTxs = groupedByTarget[targetId];
+      
+      let totalSent = 0;
+      let totalReceived = 0;
+      let tokenStr = "TON";
 
-    // 3. Configuration dynamique du trait
-    let edgeColor = '#ef4444'; // Rouge par défaut
-    let edgeLabel = '';
-    let sourceNode = 'me';
-    let targetNode = wallet.id;
+      targetTxs.forEach(tx => {
+        if (tx.action === "SEND") totalSent += tx.amount;
+        if (tx.action === "RECEIVE") totalReceived += tx.amount;
+        tokenStr = tx.token;
+      });
 
-    if (isBidirectional) {
-      edgeColor = '#a855f7'; // Violet (Couleur d'échange mutuel)
-      edgeLabel = `↑ ${totalSent} | ↓ ${totalReceived} ${tokenStr}`;
-      // La source reste "me", la cible est le wallet
-    } else if (isSendingOnly) {
-      edgeColor = '#ef4444'; // Rouge (Je donne)
-      edgeLabel = `${totalSent} ${tokenStr}`;
-    } else {
-      edgeColor = '#22c55e'; // Vert (Je reçois)
-      edgeLabel = `${totalReceived} ${tokenStr}`;
-      sourceNode = wallet.id; // On inverse la source pour que la flèche pointe vers moi
-      targetNode = 'me';
-    }
+      const isBidirectional = totalSent > 0 && totalReceived > 0;
+      const isSending = totalSent > 0 && totalReceived === 0;
 
-    const newEdge = {
-      id: `edge-me-${wallet.id}`,
-      source: sourceNode,
-      target: targetNode,
-      animated: true,
-      label: edgeLabel,
-      style: { stroke: edgeColor, strokeWidth: 2.5 },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,
-        height: 20,
-        color: edgeColor,
-      },
-      // 🆕 NOUVEAU : Si c'est bidirectionnel, on ajoute une flèche au point de départ aussi !
-      ...(isBidirectional && {
-        markerStart: {
-          type: MarkerType.ArrowClosed,
-          width: 20,
-          height: 20,
-          color: edgeColor,
-        }
-      }),
-      labelStyle: { fill: '#fff', fontWeight: 700, fontSize: 10 },
-      labelBgStyle: { fill: '#1a2535', color: '#fff', fillOpacity: 0.9 },
-      labelBgPadding: [8, 4],
-      labelBgBorderRadius: 4,
-    };
+      // Design dynamique
+      let color = isBidirectional ? '#a855f7' : (isSending ? '#ef4444' : '#22c55e');
+      let label = isBidirectional 
+        ? `↑ ${totalSent} | ↓ ${totalReceived} ${tokenStr}`
+        : `${isSending ? totalSent : totalReceived} ${tokenStr}`;
 
-    return [newEdge];
+      return {
+        id: `edge-${wallet.id}-${targetId}`,
+        // La source est toujours celui qu'on inspecte pour la cohérence, sauf si on reçoit uniquement
+        source: isSending || isBidirectional ? wallet.id : targetId,
+        target: isSending || isBidirectional ? targetId : wallet.id,
+        animated: true,
+        label: label,
+        style: { stroke: color, strokeWidth: 2.5 },
+        markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: color },
+        ...(isBidirectional && {
+          markerStart: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: color }
+        }),
+        labelStyle: { fill: '#fff', fontWeight: 700, fontSize: 10 },
+        labelBgStyle: { fill: '#1a2535', fillOpacity: 0.9 },
+        labelBgPadding: [8, 4],
+        labelBgBorderRadius: 4,
+      };
+    });
+
+    return newEdges;
   };
 
   /* ── 4. L'ACTION AU CLIC ── */
@@ -301,12 +287,9 @@ export default function BubbleMap({
       return;
     }
 
-    // 🛡️ 🆕 NOUVEAU : ANTI-ARNAQUE AVANCÉ
-    // On vérifie s'il existe une transaction avec "me" dans son historique
-    const hasTxWithMe = wallet.recentTransactions && wallet.recentTransactions.some((tx: any) => tx.with === "me");
-    
-    if (!hasTxWithMe) {
-      alert(`🛡️ Protection activée : Vous n'avez aucune transaction directe avec ${wallet.name}. Paiement annulé pour protéger vos fonds !`);
+    // 🛡️ ANTI-ARNAQUE : On vérifie s'il y a au moins une transaction dans son historique
+    if (!wallet.recentTransactions || wallet.recentTransactions.length === 0) {
+      alert(`❌ Ce wallet n'a aucun historique de transaction détecté. Paiement annulé.`);
       return;
     }
 
