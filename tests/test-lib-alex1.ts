@@ -4,7 +4,7 @@ async function main() {
   // First, ensure WASM is initialized (some bundlers call default export automatically; if not, call init())
   await init();
 
-  const address = "EQC...";
+  const address = "0QD6a-uyjiAX8gRmtPi2ztdeBEliw6GrBa6dQBeM8wlQfJ5K";
   const apiKey = "e251fe96771c8fe3e7c93798924a1b12c600aecfcc25d4b9fa9178ca15a9050d";
 
   const info = await get_address_information_json(address, apiKey);
