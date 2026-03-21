@@ -138,7 +138,7 @@ export default function BottomBar() {
   /* ── not connected ── */
   if (!restored || !connected) {
     return (
-      <footer style={{ height: "42vh" }} className="fixed bottom-0 left-0 w-full z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42]">
+      <footer style={{ height: "42vh" }} className="fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42]">
         <div style={{ height: 2, background: "linear-gradient(90deg, #1c2d42 0%, transparent 60%)", flexShrink: 0 }} />
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           {!restored ? (
@@ -167,7 +167,7 @@ export default function BottomBar() {
 
   /* ── connected ── */
   return (
-    <footer style={{ height: "42vh" }} className="fixed bottom-0 left-0 w-full z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42]">
+    <footer style={{ height: "42vh" }} className="fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42]">
 
       {/* accent line */}
       <div style={{ height: 2, background: `linear-gradient(90deg, ${networkColor} 0%, transparent 60%)`, flexShrink: 0 }} />
