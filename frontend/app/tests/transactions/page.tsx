@@ -152,11 +152,11 @@ export default function TransactionsTestPage() {
 
   // ── Render ───────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen bg-surface text-on-surface font-body">
+    <>
       <TopNavBar />
-      <div className="flex flex-1 overflow-hidden">
-        <SideNavBar />
-        <main className="flex-1 overflow-auto p-6 space-y-6">
+      <SideNavBar />
+      <main className="fixed left-20 right-0 top-14 bottom-0 bg-surface text-on-surface font-body overflow-y-auto">
+        <div className="p-6 space-y-6">
           {/* Title */}
           <h1 className="text-2xl font-headline font-bold text-primary">
             Wallet Transactions (WASM)
@@ -399,8 +399,8 @@ export default function TransactionsTestPage() {
               <span className="text-sm">Fetching transactions via WASM…</span>
             </div>
           )}
-        </main>
-      </div>
-    </div>
+        </div>
+      </main>
+    </>
   );
 }
