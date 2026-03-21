@@ -246,17 +246,104 @@ export default function BottomBar() {
           </div>
         </div>
 
-        {/* ── COL 3 / ROW 3: activity placeholder ── */}
+        {/* ── COL 3 / ROW 3: on-chain activity ── */}
         <div className="flex flex-col flex-1 min-w-0 py-3 sm:py-0">
-          <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase px-4 sm:px-5 pt-1 sm:pt-4 pb-2 shrink-0">
+          <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase px-4 sm:px-5 pt-1 sm:pt-4 pb-2 shrink-0 flex items-center gap-2">
             On-chain Activity
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#00e676" }} />
           </div>
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 sm:gap-3 text-center px-6 sm:px-8">
-            <span className="material-symbols-outlined text-2xl sm:text-3xl text-[#1c2d42]">analytics</span>
-            <p className="font-mono text-[10px] text-[#253548] uppercase tracking-widest leading-relaxed">
-              Real-time on-chain data<br />coming soon
-            </p>
-          </div>
+
+          {statsLoading && !stats && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2">
+              <div className="w-6 h-6 border-2 border-[#1c2d42] border-t-[#00E5FF] rounded-full animate-spin" />
+              <span className="font-mono text-[9px] text-[#4a6080] uppercase tracking-widest">Fetching…</span>
+            </div>
+          )}
+
+          {stats && (
+            <div className="flex-1 flex flex-col justify-center gap-3 sm:gap-4 px-4 sm:px-5">
+              {/* Balance */}
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                     style={{ background: "rgba(0,152,234,.12)", border: "1px solid rgba(0,152,234,.25)" }}>
+                  <span className="material-symbols-outlined text-base" style={{ color: "#0098EA" }}>account_balance</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase">Balance</div>
+                  <div className="font-mono text-sm font-bold" style={{ color: "#0098EA" }}>
+                    {stats.balanceNano !== null ? fmtTon(stats.balanceNano) + " TON" : "—"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tx count + counterparties row */}
+              <div className="flex gap-4 sm:gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                       style={{ background: "rgba(168,85,247,.12)", border: "1px solid rgba(168,85,247,.25)" }}>
+                    <span className="material-symbols-outlined text-base" style={{ color: "#a855f7" }}>receipt_long</span>
+                  </div>
+                  <div>
+                    <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase">Transactions</div>
+                    <div className="font-mono text-sm font-bold text-[#c8d8ec]">{stats.totalTxFetched}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                       style={{ background: "rgba(6,182,212,.12)", border: "1px solid rgba(6,182,212,.25)" }}>
+                    <span className="material-symbols-outlined text-base" style={{ color: "#06b6d4" }}>group</span>
+                  </div>
+                  <div>
+                    <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase">Wallets</div>
+                    <div className="font-mono text-sm font-bold text-[#c8d8ec]">{stats.counterpartyCount}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top counterparty */}
+              {stats.topCounterparty && (
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                       style={{ background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.25)" }}>
+                    <span className="material-symbols-outlined text-base" style={{ color: "#f59e0b" }}>star</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase">Top Counterparty</div>
+                    <div className="font-mono text-[10px] text-[#c8d8ec] truncate">
+                      {fmtAddr(stats.topCounterparty.address)}
+                      <span className="text-[#4a6080]"> · </span>
+                      <span className="text-[#a855f7]">{stats.topCounterparty.txCount} tx</span>
+                      <span className="text-[#4a6080]"> · </span>
+                      <span style={{ color: "#0098EA" }}>{fmtTon(stats.topCounterparty.volumeNano)} TON</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Last activity */}
+              {stats.lastActivity && (
+                <div className="font-mono text-[9px] text-[#253548] uppercase tracking-widest">
+                  Last activity: {(() => {
+                    const diff = Math.floor(Date.now() / 1000) - stats.lastActivity!;
+                    if (diff < 60) return diff + "s ago";
+                    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+                    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+                    return Math.floor(diff / 86400) + "d ago";
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!stats && !statsLoading && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 sm:gap-3 text-center px-6 sm:px-8">
+              <span className="material-symbols-outlined text-2xl sm:text-3xl text-[#1c2d42]">analytics</span>
+              <p className="font-mono text-[10px] text-[#253548] uppercase tracking-widest leading-relaxed">
+                No on-chain data available
+              </p>
+            </div>
+          )}
         </div>
 
       </div>
