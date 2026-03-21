@@ -105,7 +105,33 @@ const PersonNode = ({ data }: { data: NodeData }) => {
 ════════════════════════════════════════════════════════ */
 const LS_KEY = "bubblemap-state";
 
-function loadSaved(): { nodePositions: Record<string, { x: number; y: number }>; edges: any[]; unlockedWallets: string[] } | null {
+type SavedState = {
+  nodePositions: Record<string, { x: number; y: number }>;
+  edges: any[];
+  unlockedWallets: string[];
+};
+
+/** Decompress a gzip-compressed base64url string back to JSON */
+async function decompressFromUrl(b64url: string): Promise<SavedState | null> {
+  try {
+    // base64url → standard base64
+    const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+    const padding = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+    const binary = atob(b64 + padding);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+
+    const ds = new DecompressionStream("gzip");
+    const writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const decompressed = await new Response(ds.readable).text();
+    return JSON.parse(decompressed);
+  } catch {
+    return null;
+  }
+}
+
+function loadSaved(): SavedState | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(LS_KEY);
