@@ -10,6 +10,7 @@
   "dependencies": {
     "@tonconnect/ui-react": "^2.4.2",
     "@xyflow/react": "^12.10.1",
+    "html-to-image": "^1.11.13",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
