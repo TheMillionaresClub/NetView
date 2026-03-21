@@ -21,6 +21,7 @@ export default function BottomBar() {
       const dataUrl = await toPng(el, {
         backgroundColor: "#080d14",
         pixelRatio: 2, // retina-quality
+        skipFonts: true, // avoid CORS errors from cross-origin Google Fonts
         filter: (node) => {
           // Skip the ReactFlow controls/minimap chrome from the screenshot
           const cls = node.classList?.toString() ?? "";

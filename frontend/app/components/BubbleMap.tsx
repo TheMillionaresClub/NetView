@@ -257,6 +257,7 @@ export default function BubbleMap({
           }
         });
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setNodes, setEdges, userAddress]);
 
   /* ── 2. LOGIQUE DU PAIEMENT ── */

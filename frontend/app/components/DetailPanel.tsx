@@ -15,6 +15,7 @@ export interface RecentTransaction {
   amount: number;
   token: string;
   time: string;
+  with: string;
 }
 
 export interface WalletData {
