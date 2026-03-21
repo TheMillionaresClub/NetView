@@ -43,11 +43,16 @@ export default function BottomBar() {
           files: [file],
         });
       } else {
-        // Fallback: download the image
+        // Fallback: download the image via blob URL
+        const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = dataUrl;
+        a.href = blobUrl;
         a.download = "netview-graph.png";
+        document.body.appendChild(a);
         a.click();
+        // Clean up
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
       }
 
       setDone(true);
