@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-label: "Inter", system-ui, sans-serif;
+
+  --color-on-secondary: #00363f;
+  --color-inverse-surface: #e1e2e7;
+  --color-on-tertiary-container: #9800b3;
+  --color-on-primary-fixed-variant: #004f58;
+  --color-inverse-on-surface: #2e3134;
+  --color-primary-container: #00e5ff;
+  --color-on-background: #e1e2e7;
+  --color-primary-fixed: #9cf0ff;
+  --color-surface-container-high: #272a2e;
+  --color-surface-container: #1d2023;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+  --color-outline-variant: #3b494c;
+  --color-secondary-container: #03b9d5;
+  --color-tertiary-container: #fbbbff;
+  --color-on-surface-variant: #bac9cc;
+  --color-on-tertiary-fixed-variant: #7b0090;
+  --color-surface-container-low: #191c1f;
+  --color-inverse-primary: #006875;
+  --color-on-secondary-container: #004450;
+  --color-surface-container-lowest: #0b0e11;
+  --color-secondary: #49d7f4;
+  --color-tertiary-fixed: #ffd6ff;
+  --color-on-surface: #e1e2e7;
+  --color-surface: #111417;
+  --color-surface-variant: #323538;
+  --color-on-secondary-fixed-variant: #004e5b;
+  --color-primary: #c3f5ff;
+  --color-error: #ffb4ab;
+  --color-on-secondary-fixed: #001f26;
+  --color-on-primary: #00363d;
+  --color-primary-fixed-dim: #00daf3;
+  --color-tertiary: #ffe5fc;
+  --color-surface-bright: #37393d;
+  --color-outline: #849396;
+  --color-surface-container-highest: #323538;
+  --color-secondary-fixed: #a8edff;
+  --color-secondary-fixed-dim: #49d7f4;
+  --color-on-tertiary: #570067;
+  --color-error-container: #93000a;
+  --color-surface-tint: #00daf3;
+  --color-tertiary-fixed-dim: #f8acff;
+  --color-on-primary-container: #00626e;
+  --color-surface-dim: #111417;
+  --color-on-primary-fixed: #001f24;
+  --color-background: #111417;
+  --color-on-tertiary-fixed: #350040;
+
+  --radius: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+}
+
+/* Google Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.grid-bg {
+  background-image: radial-gradient(circle, #3b494c 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+::selection {
+  background-color: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+}
