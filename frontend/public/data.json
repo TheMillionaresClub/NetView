@@ -1,0 +1,87 @@
+[
+  {
+    "id": "user_1",
+    "name": "Karim",
+    "type": "primary",
+    "totalVolume": 45200,
+    "totalTransactions": 128,
+    "topTokens": [
+      { "symbol": "ETH", "balance": 12.5 },
+      { "symbol": "USDT", "balance": 15000 },
+      { "symbol": "SOL", "balance": 45 }
+    ],
+    "recentTransactions": [
+      { "action": "SWAP", "amount": 1200, "token": "USDT", "time": "2 mins ago" },
+      { "action": "RECEIVE", "amount": 5.2, "token": "ETH", "time": "1 hour ago" },
+      { "action": "SEND", "amount": 300, "token": "USDC", "time": "3 hours ago" }
+    ]
+  },
+  {
+    "id": "user_2",
+    "name": "Alice",
+    "type": "whale",
+    "totalVolume": 850000,
+    "totalTransactions": 42,
+    "topTokens": [
+      { "symbol": "WBTC", "balance": 4.5 },
+      { "symbol": "ETH", "balance": 120 },
+      { "symbol": "LINK", "balance": 5000 }
+    ],
+    "recentTransactions": [
+      { "action": "BUY", "amount": 25000, "token": "ETH", "time": "12 secs ago" },
+      { "action": "STAKE", "amount": 100000, "token": "USDT", "time": "5 mins ago" },
+      { "action": "SWAP", "amount": 5000, "token": "LINK", "time": "1 day ago" }
+    ]
+  },
+  {
+    "id": "user_3",
+    "name": "Thomas",
+    "type": "trader",
+    "totalVolume": 125000,
+    "totalTransactions": 985,
+    "topTokens": [
+      { "symbol": "USDT", "balance": 85000 },
+      { "symbol": "BTC", "balance": 1.2 },
+      { "symbol": "BNB", "balance": 45 }
+    ],
+    "recentTransactions": [
+      { "action": "WITHDRAW", "amount": 4500, "token": "USDT", "time": "Just now" },
+      { "action": "DEPOSIT", "amount": 0.5, "token": "BTC", "time": "1 min ago" },
+      { "action": "WITHDRAW", "amount": 120, "token": "SOL", "time": "1 min ago" }
+    ]
+  },
+  {
+    "id": "user_4",
+    "name": "Sarah",
+    "type": "degen",
+    "totalVolume": 1500,
+    "totalTransactions": 854,
+    "topTokens": [
+      { "symbol": "PEPE", "balance": 45000000 },
+      { "symbol": "WIF", "balance": 1200 },
+      { "symbol": "SOL", "balance": 2.5 }
+    ],
+    "recentTransactions": [
+      { "action": "SWAP", "amount": 50, "token": "PEPE", "time": "5 mins ago" },
+      { "action": "SWAP", "amount": 100, "token": "WIF", "time": "10 mins ago" },
+      { "action": "APPROVE", "amount": 0, "token": "USDC", "time": "1 hour ago" }
+    ]
+  },
+  {
+    "id": "user_5",
+    "name": "Marc",
+    "type": "investor",
+    "totalVolume": 45000,
+    "totalTransactions": 154,
+    "topTokens": [
+      { "symbol": "USDC", "balance": 25000 },
+      { "symbol": "ETH", "balance": 8.5 },
+      { "symbol": "DAI", "balance": 4500 }
+    ],
+    "recentTransactions": [
+      { "action": "POOL_ADD", "amount": 15000, "token": "USDC", "time": "30 secs ago" },
+      { "action": "SWAP", "amount": 450, "token": "ETH", "time": "1 min ago" },
+      { "action": "ROUTE", "amount": 1200, "token": "DAI", "time": "2 mins ago" }
+    ]
+  }
+]
