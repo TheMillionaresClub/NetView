@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { icon: "hub", label: "Network", href: "/" },
   { icon: "receipt_long", label: "Txns", href: "/transactions" },
+  { icon: "share", label: "Trace", href: "/trace" },
   { icon: "analytics", label: "Analytics", href: "/analytics" },
   { icon: "account_balance_wallet", label: "Wallet", href: "/wallet/search" },
 ];
