@@ -8,9 +8,9 @@ const core = new Core({
 const walletKit = await WalletKit.init({
   core, // <- pass the shared `core` instance
   metadata: {
-    name: "Demo app",
-    description: "Demo Client as Wallet/Peer",
-    url: "https://reown.com/walletkit",
+    name: "NetView",
+    description: "NetView Client as Wallet/Peer",
+    url: "https://netview.app/walletkit",
     icons: [],
   },
 });
