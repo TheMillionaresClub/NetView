@@ -11,12 +11,14 @@ Usage:
 """
 
 import argparse
+import base64
 import json
 import time
 import sys
 from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 
 # ── Defaults ──────────────────────────────────────────────────────
 DEFAULT_API_KEY = "e251fe96771c8fe3e7c93798924a1b12c600aecfcc25d4b9fa9178ca15a9050d"
@@ -26,8 +28,8 @@ MAINNET_URL     = "https://toncenter.com/api/v2"
 
 def api_get(base_url: str, method: str, params: dict, api_key: str) -> dict:
     """Call toncenter HTTP API (GET)."""
-    qs = "&".join(f"{k}={v}" for k, v in params.items() if v is not None)
-    url = f"{base_url}/{method}?{qs}"
+    filtered = {k: v for k, v in params.items() if v is not None}
+    url = f"{base_url}/{method}?{urlencode(filtered)}"
     req = Request(url, headers={"X-API-Key": api_key, "Accept": "application/json"})
     try:
         with urlopen(req) as resp:
@@ -96,7 +98,13 @@ def fetch_all_transactions(base_url: str, address: str, api_key: str, max_txs: i
         # Prepare next page cursor
         last_tx = txs[-1]
         last_lt = last_tx["transaction_id"]["lt"]
-        last_hash = last_tx["transaction_id"]["hash"]
+        # toncenter expects the hash as hex or properly encoded base64
+        raw_hash = last_tx["transaction_id"]["hash"]
+        try:
+            # Convert base64 hash → hex (toncenter is more reliable with hex)
+            last_hash = base64.b64decode(raw_hash + "=" * (-len(raw_hash) % 4)).hex()
+        except Exception:
+            last_hash = raw_hash
 
         # Rate-limit courtesy
         time.sleep(0.3)
