@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@reown/walletkit": "^1.5.4",
+    "@tonconnect/ui-react": "^2.4.2",
     "@walletconnect/core": "^2.23.8",
     "@walletconnect/utils": "^2.23.8",
     "@xyflow/react": "^12.10.1",
