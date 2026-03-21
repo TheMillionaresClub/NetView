@@ -214,16 +214,14 @@ def main():
     # Sort by total sent (descending)
     sorted_dests = sorted(destinations.values(), key=lambda d: d["total_sent_nano"], reverse=True)
 
-    # 3. Build output
+    # 3. Build output — addresses only
     total_sent_nano = sum(d["total_sent_nano"] for d in sorted_dests)
+    address_list = [d["address"] for d in sorted_dests]
     output = {
         "source_wallet": args.address,
         "network": network,
-        "total_transactions_scanned": len(transactions),
-        "unique_destinations": len(sorted_dests),
-        "total_ton_sent": round(total_sent_nano / 1e9, 9),
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
-        "destinations": sorted_dests,
+        "unique_destinations": len(address_list),
+        "addresses": address_list,
     }
 
     # 4. Save
