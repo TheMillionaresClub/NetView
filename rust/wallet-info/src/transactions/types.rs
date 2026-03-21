@@ -24,8 +24,12 @@ impl Deref for DecodedBoc {
 impl<'de> Deserialize<'de> for DecodedBoc {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let raw = String::deserialize(d)?;
-        let value = smart_decode(&raw).map_err(serde::de::Error::custom)?;
-        Ok(DecodedBoc(value))
+        // Try to decode the BOC; if it fails, keep the raw base64 string
+        // so that one unparseable cell doesn't kill the whole response.
+        match smart_decode(&raw) {
+            Ok(value) => Ok(DecodedBoc(value)),
+            Err(_) => Ok(DecodedBoc(Value::String(raw))),
+        }
     }
 }
 
