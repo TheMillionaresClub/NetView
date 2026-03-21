@@ -9,7 +9,7 @@ pub enum Action {
     Receive,
     Send,
 }
-
+ 
 #[derive(Debug, Serialize)]
 pub struct Transaction {
     /// The other party — sender on Receive, recipient on Send.
