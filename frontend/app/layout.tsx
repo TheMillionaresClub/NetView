@@ -5,6 +5,10 @@ import Providers from "./providers";
 export const metadata: Metadata = {
   title: "NetView - Kinetic Ledger",
   description: "Blockchain network visualization and wallet analytics",
+  icons: {
+    icon: "/image.png",
+    apple: "/image.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,9 +1,11 @@
+import Image from "next/image";
 import TonWalletComp from "./TonWalletComp";
 
 export default function TopNavBar() {
   return (
     <header className="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-14 bg-[#111417] border-none">
       <div className="flex items-center gap-2">
+        <Image src="/image.png" alt="NetView" width={28} height={28} className="object-contain" />
         <span className="text-xl font-bold text-[#00E5FF] font-headline uppercase tracking-tighter">
           NetView
         </span>
