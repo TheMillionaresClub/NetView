@@ -1,10 +1,9 @@
+use futures::future::join_all;
 use serde::Deserialize;
 use serde_json::Value;
 
 use super::client::{AnalysisError, Result, TonAnalysisClient};
-use super::types::{
-    DnsRecord, JettonBalance, NftItem, TransactionPage, TxSummary, WalletInfo, WalletState,
-};
+use super::types::{DnsRecord, JettonBalance, NftItem, TransactionPage, TxSummary, WalletInfo, WalletState};
 
 // ── Helper: treat 404 as empty ───────────────────────────────────────────────
 
@@ -140,6 +139,39 @@ struct JettonContent {
     image: Option<String>,
 }
 
+// ── Jetton master (fallback for metadata) ────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+struct JettonMastersResp {
+    jetton_masters: Vec<RawJettonMaster>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawJettonMaster {
+    jetton_content: Option<JettonContent>,
+}
+
+async fn get_jetton_master(
+    client: &TonAnalysisClient,
+    jetton_address: &str,
+) -> Option<JettonContent> {
+    let url = format!("{}/jetton/masters", client.base_v3);
+    let resp: JettonMastersResp = client
+        .get(&url, &[("address", jetton_address)])
+        .await
+        .ok()?;
+    resp.jetton_masters.into_iter().next()?.jetton_content
+}
+
+fn parse_content(c: JettonContent) -> (Option<String>, Option<String>, Option<u8>, Option<String>) {
+    let dec = c.decimals.and_then(|v| match v {
+        Value::Number(n) => n.as_u64().map(|n| n as u8),
+        Value::String(s) => s.parse::<u8>().ok(),
+        _ => None,
+    });
+    (c.name, c.symbol, dec, c.image)
+}
+
 pub async fn get_jetton_wallets(
     client: &TonAnalysisClient,
     address: &str,
@@ -154,21 +186,23 @@ pub async fn get_jetton_wallets(
         Err(e) => return Err(e),
     };
 
-    let jettons = resp
-        .jetton_wallets
-        .into_iter()
-        .map(|r| {
-            let (name, symbol, decimals, image) = r
-                .jetton_content
-                .map(|c| {
-                    let dec = c.decimals.and_then(|v| match v {
-                        Value::Number(n) => n.as_u64().map(|n| n as u8),
-                        Value::String(s) => s.parse::<u8>().ok(),
-                        _ => None,
-                    });
-                    (c.name, c.symbol, dec, c.image)
-                })
-                .unwrap_or((None, None, None, None));
+    // For each wallet: use embedded content if it has a name/symbol,
+    // otherwise fetch the jetton master concurrently as a fallback.
+    let futs = resp.jetton_wallets.into_iter().map(|r| {
+        let client = client.clone();
+        async move {
+            let has_meta = r.jetton_content.as_ref()
+                .map(|c| c.name.is_some() || c.symbol.is_some())
+                .unwrap_or(false);
+
+            let content = if has_meta {
+                r.jetton_content
+            } else {
+                get_jetton_master(&client, &r.jetton).await.or(r.jetton_content)
+            };
+
+            let (name, symbol, decimals, image) =
+                content.map(parse_content).unwrap_or_default();
 
             JettonBalance {
                 jetton_address: r.jetton,
@@ -179,10 +213,10 @@ pub async fn get_jetton_wallets(
                 decimals,
                 image,
             }
-        })
-        .collect();
+        }
+    });
 
-    Ok(jettons)
+    Ok(join_all(futs).await)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

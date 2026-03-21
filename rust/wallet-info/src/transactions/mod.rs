@@ -1,16 +1,16 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::transactions::types::{ExtTransaction, RpcResponse};
 
 pub mod types;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
     Receive,
     Send,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
     /// The other party — sender on Receive, recipient on Send.
     pub address:   String,

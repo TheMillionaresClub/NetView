@@ -19,8 +19,10 @@ pub type Result<T> = std::result::Result<T, AnalysisError>;
 
 // ── Client ────────────────────────────────────────────────────────────────────
 
+#[derive(Clone)]
 pub struct TonAnalysisClient {
-    http:        Client,
+    pub http:    Client,
+    pub network: Network,
     pub base_v2: String,
     pub base_v3: String,
     api_key:     Option<String>,
@@ -38,7 +40,11 @@ impl TonAnalysisClient {
                 "https://testnet.toncenter.com/api/v3".to_string(),
             ),
         };
-        Self { http: Client::new(), base_v2, base_v3, api_key }
+        Self { http: Client::new(), network: *network, base_v2, base_v3, api_key }
+    }
+
+    pub fn api_key(&self) -> Option<&str> {
+        self.api_key.as_deref()
     }
 
     pub async fn get<T: DeserializeOwned>(

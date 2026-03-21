@@ -3,11 +3,17 @@
 
 /**
  * Fetch a full wallet profile: identity, balance, tokens, NFTs, DNS,
- * recent transactions (100), and a heuristic classification.
- *
+ * recent transactions (100), interacted wallet balances, and classification.
+ * Returns a JSON string — serde_wasm_bindgen produces circular refs in Node.js.
  * `network` — `"mainnet"` or `"testnet"` (default: testnet)
  */
-export function analyze_wallet(address: string, network?: string | null, api_key?: string | null): Promise<any>;
+export function analyze_wallet(address: string, network?: string | null, api_key?: string | null): Promise<string>;
+
+/**
+ * Alias for `analyze_wallet` — `WalletProfile` already includes
+ * `interacted_wallets` (counterparty balances).
+ */
+export function full_analysis(address: string, network?: string | null, api_key?: string | null): Promise<string>;
 
 export function get_address_information(address: string): Promise<string>;
 

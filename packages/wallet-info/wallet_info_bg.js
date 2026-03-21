@@ -1,12 +1,12 @@
 /**
  * Fetch a full wallet profile: identity, balance, tokens, NFTs, DNS,
- * recent transactions (100), and a heuristic classification.
- *
+ * recent transactions (100), interacted wallet balances, and classification.
+ * Returns a JSON string — serde_wasm_bindgen produces circular refs in Node.js.
  * `network` — `"mainnet"` or `"testnet"` (default: testnet)
  * @param {string} address
  * @param {string | null} [network]
  * @param {string | null} [api_key]
- * @returns {Promise<any>}
+ * @returns {Promise<string>}
  */
 export function analyze_wallet(address, network, api_key) {
     const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -16,6 +16,25 @@ export function analyze_wallet(address, network, api_key) {
     var ptr2 = isLikeNone(api_key) ? 0 : passStringToWasm0(api_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len2 = WASM_VECTOR_LEN;
     const ret = wasm.analyze_wallet(ptr0, len0, ptr1, len1, ptr2, len2);
+    return ret;
+}
+
+/**
+ * Alias for `analyze_wallet` — `WalletProfile` already includes
+ * `interacted_wallets` (counterparty balances).
+ * @param {string} address
+ * @param {string | null} [network]
+ * @param {string | null} [api_key]
+ * @returns {Promise<string>}
+ */
+export function full_analysis(address, network, api_key) {
+    const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    var ptr1 = isLikeNone(network) ? 0 : passStringToWasm0(network, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len1 = WASM_VECTOR_LEN;
+    var ptr2 = isLikeNone(api_key) ? 0 : passStringToWasm0(api_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len2 = WASM_VECTOR_LEN;
+    const ret = wasm.full_analysis(ptr0, len0, ptr1, len1, ptr2, len2);
     return ret;
 }
 
@@ -58,13 +77,6 @@ export function get_transactions(address, limit, lt, hash, api_key) {
 export function __wbg_Error_83742b46f01ce22d(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return ret;
-}
-export function __wbg_String_8564e559799eccda(arg0, arg1) {
-    const ret = String(arg1);
-    const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
-    getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
 }
 export function __wbg___wbindgen_debug_string_5398f5bb970e0daa(arg0, arg1) {
     const ret = debugString(arg1);
@@ -302,7 +314,7 @@ export function __wbg_value_21fc78aab0322612(arg0) {
     return ret;
 }
 export function __wbindgen_cast_0000000000000001(arg0, arg1) {
-    // Cast intrinsic for `Closure(Closure { dtor_idx: 177, function: Function { arguments: [Externref], shim_idx: 178, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+    // Cast intrinsic for `Closure(Closure { dtor_idx: 198, function: Function { arguments: [Externref], shim_idx: 199, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
     const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__ha6766aa722118a08, wasm_bindgen__convert__closures_____invoke__h80556c7c89519524);
     return ret;
 }

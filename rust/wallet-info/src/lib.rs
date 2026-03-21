@@ -85,21 +85,32 @@ pub async fn get_transactions(
 }
 
 /// Fetch a full wallet profile: identity, balance, tokens, NFTs, DNS,
-/// recent transactions (100), and a heuristic classification.
-///
+/// recent transactions (100), interacted wallet balances, and classification.
+/// Returns a JSON string — serde_wasm_bindgen produces circular refs in Node.js.
 /// `network` — `"mainnet"` or `"testnet"` (default: testnet)
 #[wasm_bindgen]
 pub async fn analyze_wallet(
     address: String,
     network: Option<String>,
     api_key: Option<String>,
-) -> Result<JsValue, JsValue> {
+) -> Result<String, JsValue> {
     let net = parse_network(network.as_deref());
     let client = analysis::make_client(&net, api_key);
 
     match analysis::analyze_wallet(&client, &address).await {
-        Ok(profile) => serde_wasm_bindgen::to_value(&profile)
+        Ok(profile) => serde_json::to_string(&profile)
             .map_err(|e| serde_wasm_bindgen::to_value(&json!({ "error": e.to_string() })).unwrap()),
         Err(e) => Err(serde_wasm_bindgen::to_value(&json!({ "error": e.to_string() })).unwrap()),
     }
+}
+
+/// Alias for `analyze_wallet` — `WalletProfile` already includes
+/// `interacted_wallets` (counterparty balances).
+#[wasm_bindgen]
+pub async fn full_analysis(
+    address: String,
+    network: Option<String>,
+    api_key: Option<String>,
+) -> Result<String, JsValue> {
+    analyze_wallet(address, network, api_key).await
 }
