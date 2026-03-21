@@ -242,16 +242,15 @@ def main():
     print(f"  │  Results                                    │")
     print(f"  ├─────────────────────────────────────────────┤")
     print(f"  │  Transactions scanned : {len(transactions):>10}          │")
-    print(f"  │  Unique destinations  : {len(sorted_dests):>10}          │")
-    print(f"  │  Total TON sent       : {output['total_ton_sent']:>14.4f}    │")
+    print(f"  │  Unique destinations  : {len(address_list):>10}          │")
     print(f"  └─────────────────────────────────────────────┘")
     print()
 
-    # Top 10 preview
-    print(f"  Top destinations:")
-    for i, d in enumerate(sorted_dests[:10], 1):
-        addr_short = d["address"][:12] + "..." + d["address"][-6:] if len(d["address"]) > 20 else d["address"]
-        print(f"    {i:>2}. {addr_short:<22}  {d['total_sent_ton']:>12.4f} TON  ({d['tx_count']} txs)")
+    # Preview
+    print(f"  Addresses:")
+    for i, addr in enumerate(address_list[:10], 1):
+        addr_short = addr[:12] + "..." + addr[-6:] if len(addr) > 20 else addr
+        print(f"    {i:>2}. {addr_short}")
 
     print(f"\n  ✓ Saved to {out_path}")
 
