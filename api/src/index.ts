@@ -11,6 +11,7 @@ const { default: weatherRouter } = await import("./routes/weather.js");
 const { default: premiumContentRouter } = await import("./routes/premium-content.js");
 const { default: facilitatorRouter } = await import("./routes/facilitator.js");
 const { default: walletInfoRouter } = await import("./routes/wallet-info.js");
+const { default: walletTransactionsRouter } = await import("./routes/wallet-transactions.js");
 const { default: traceLinkRouter } = await import("./routes/trace-link.js");
 
 const app = express();
@@ -31,6 +32,7 @@ app.use("/api/weather", weatherRouter);
 app.use("/api/premium-content", premiumContentRouter);
 app.use("/api/facilitator", facilitatorRouter);
 app.use("/api/wallet-info", walletInfoRouter);
+app.use("/api/wallet-transactions", walletTransactionsRouter);
 app.use("/api/trace-link", traceLinkRouter);
 
 app.listen(PORT, () => {
