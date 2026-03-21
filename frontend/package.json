@@ -8,9 +8,7 @@
     "start": "next start --port 3002"
   },
   "dependencies": {
-    "@reown/walletkit": "^1.5.4",
-    "@walletconnect/core": "^2.23.8",
-    "@walletconnect/utils": "^2.23.8",
+    "@tonconnect/ui-react": "^2.4.2",
     "@xyflow/react": "^12.10.1",
     "next": "^15.0.0",
     "react": "^19.0.0",

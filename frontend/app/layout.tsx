@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "NetView - Kinetic Ledger",
@@ -24,7 +25,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-surface-container-lowest text-on-surface font-body overflow-hidden">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
