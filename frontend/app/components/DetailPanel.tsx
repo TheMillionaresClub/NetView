@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useTonConnectUI } from "@tonconnect/ui-react";
+// import { useTonConnectUI } from "@tonconnect/ui-react";
 
 /* ════════════════════════════════════════════════════════
    TYPES
@@ -76,6 +76,9 @@ interface Props {
   onClose: () => void;
   flow: CounterpartyFlow | null;
   centerAddress: string | null;
+  walletBalance: number | null;
+  onExpand: (address: string) => void;
+  isExpanded: boolean;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -112,25 +115,25 @@ function timeAgo(utime: number): string {
 }
 
 function shortAddr(addr: string | undefined | null): string {
-  if (!addr) return "\u2014";
+  if (!addr) return "-";
   if (addr.length <= 12) return addr;
-  return addr.slice(0, 6) + "\u2026" + addr.slice(-4);
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
 }
 
-const KIND_THEME: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
-  HumanWallet:   { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "HUMAN WALLET",   emoji: "\uD83D\uDC64" },
-  BotWallet:     { color: "#f59e0b", bg: "rgba(245,158,11,.12)",  label: "BOT WALLET",     emoji: "\uD83E\uDD16" },
-  SmartContract: { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "SMART CONTRACT", emoji: "\uD83D\uDCDC" },
-  Exchange:      { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "EXCHANGE",       emoji: "\uD83C\uDFDB" },
-  Unknown:       { color: "#64748b", bg: "rgba(100,116,139,.12)", label: "UNKNOWN",        emoji: "\u2753" },
+const KIND_THEME: Record<string, { color: string; bg: string; label: string }> = {
+  HumanWallet:   { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "HUMAN WALLET"   },
+  BotWallet:     { color: "#f59e0b", bg: "rgba(245,158,11,.12)",  label: "BOT WALLET"     },
+  SmartContract: { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "SMART CONTRACT" },
+  Exchange:      { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "EXCHANGE"       },
+  Unknown:       { color: "#64748b", bg: "rgba(100,116,139,.12)", label: "UNKNOWN"        },
 };
 
-const TYPE_THEME: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
-  primary:  { color: "#fb923c", bg: "rgba(249,115,22,.12)",  label: "PRIMARY",  emoji: "\u25C9" },
-  whale:    { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "WHALE",    emoji: "\u25CE" },
-  trader:   { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "TRADER",   emoji: "\u27F3" },
-  degen:    { color: "#22c55e", bg: "rgba(34,197,94,.12)",   label: "DEGEN",    emoji: "\u26A1" },
-  investor: { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "INVESTOR", emoji: "\u25C8" },
+const TYPE_THEME: Record<string, { color: string; bg: string; label: string }> = {
+  primary:  { color: "#fb923c", bg: "rgba(249,115,22,.12)",  label: "PRIMARY"  },
+  whale:    { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "WHALE"    },
+  trader:   { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "TRADER"   },
+  degen:    { color: "#22c55e", bg: "rgba(34,197,94,.12)",   label: "DEGEN"    },
+  investor: { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "INVESTOR" },
 };
 
 const TOKEN_COLORS: Record<string, string> = {
@@ -147,12 +150,11 @@ function tokenColor(sym: string): string {
 /* ════════════════════════════════════════════════════════
    COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Props) {
+export default function DetailPanel({ wallet, onClose, flow, centerAddress, walletBalance, onExpand, isExpanded }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<WalletProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
-  const [tonConnectUI] = useTonConnectUI();
 
   /* Fetch full on-chain profile (analyze_wallet) */
   const fetchFullAnalysis = useCallback(async (address: string) => {
@@ -176,39 +178,12 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
     }
   }, []);
 
-  /* Handle "Full Analysis" button: pay then fetch */
+  /* Handle "Full Analysis" button: direct fetch (no payment for testing) */
   const handleFullAnalysis = useCallback(async () => {
     if (!wallet) return;
     if (profile && profile.address === wallet.id) return;
-
-    try {
-      const response = await fetch("http://localhost:3001/api/premium-content");
-      if (response.status === 402) {
-        const invoice = await response.json();
-        const transaction = {
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [{
-            address: invoice.address || "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_",
-            amount: invoice.amount || "10000000",
-            payload: invoice.payload,
-          }],
-        };
-        await tonConnectUI.sendTransaction(transaction);
-      }
-    } catch {
-      try {
-        const tx = {
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [{ address: "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_", amount: "10000000" }],
-        };
-        await tonConnectUI.sendTransaction(tx);
-      } catch {
-        return;
-      }
-    }
-
     await fetchFullAnalysis(wallet.id);
-  }, [wallet, profile, tonConnectUI, fetchFullAnalysis]);
+  }, [wallet, profile, fetchFullAnalysis]);
 
   /* Reset profile when wallet changes */
   useEffect(() => {
@@ -264,8 +239,8 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
             background: theme.bg,
             border: "1.5px solid " + theme.color,
           }}>
-            <span style={{ color: theme.color, fontSize: 22 }}>
-              {theme.emoji}
+            <span style={{ color: theme.color, fontSize: 16, fontWeight: 700, letterSpacing: 1 }}>
+              {theme.label.charAt(0)}
             </span>
           </div>
           <div className="dp-header-info">
@@ -273,7 +248,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
             <div className="dp-wallet-id">{wallet.id}</div>
             {onchainKind ? (
               <span className="dp-badge" style={{ color: theme.color, borderColor: theme.color, background: theme.bg }}>
-                {theme.label} \u00B7 {Math.round(confidence * 100)}%
+                {theme.label} - {Math.round(confidence * 100)}%
               </span>
             ) : (
               <span className="dp-badge" style={{ color: fallbackTheme.color, borderColor: fallbackTheme.color, background: fallbackTheme.bg }}>
@@ -281,7 +256,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
               </span>
             )}
           </div>
-          <button className="dp-close" onClick={onClose}>\u2715</button>
+          <button className="dp-close" onClick={onClose}>X</button>
         </div>
 
         {/* BODY */}
@@ -296,13 +271,13 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
                   <div style={{ flex: 1 }}>
                     <div className="dp-sub-text">SENT TO THIS WALLET</div>
                     <div className="dp-flow-value" style={{ color: "#ef4444" }}>
-                      \u2191 {fmtTon(flow.sentNano)} TON
+                      Sent: {fmtTon(flow.sentNano)} TON
                     </div>
                   </div>
                   <div style={{ flex: 1 }}>
                     <div className="dp-sub-text">RECEIVED FROM THIS WALLET</div>
                     <div className="dp-flow-value" style={{ color: "#22c55e" }}>
-                      \u2193 {fmtTon(flow.receivedNano)} TON
+                      Recv: {fmtTon(flow.receivedNano)} TON
                     </div>
                   </div>
                 </div>
@@ -323,32 +298,52 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
               </div>
             )}
 
-            {/* Balance (from full profile) */}
-            {balanceNano !== null && (
+            {/* Balance (from walletBalance prop or full profile) */}
+            {(walletBalance !== null || balanceNano !== null) && (
               <div className="dp-block">
                 <div className="dp-block-label">TON BALANCE</div>
                 <div className="dp-big-number" style={{ color: "#0098EA" }}>
-                  {fmtTon(balanceNano)} TON
+                  {fmtTon(balanceNano ?? walletBalance ?? 0)} TON
                 </div>
                 {status && (
                   <div className="dp-sub-text">
                     Status: <span style={{ color: status === "active" ? "#22c55e" : "#f59e0b" }}>{status}</span>
-                    {profile?.state?.wallet_type && (" \u00B7 " + profile.state.wallet_type)}
+                    {profile?.state?.wallet_type && (" - " + profile.state.wallet_type)}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Full Analysis Button (if not yet loaded) */}
-            {!profile && !loadingProfile && (
-              <div className="dp-block" style={{ textAlign: "center", padding: "20px 16px" }}>
-                <div className="dp-block-label" style={{ marginBottom: 12 }}>FULL ON-CHAIN ANALYSIS</div>
-                <div className="dp-sub-text" style={{ marginBottom: 16 }}>
-                  Get complete wallet profile: balance, jettons, NFTs, classification, and all transactions
-                </div>
-                <button className="dp-unlock-btn" onClick={handleFullAnalysis}>
-                  Full Analysis \u00B7 0.01 TON \u2197
-                </button>
+            {/* Action Buttons */}
+            {!loadingProfile && (
+              <div className="dp-block" style={{ textAlign: "center", padding: "16px" }}>
+                {!profile && (
+                  <>
+                    <div className="dp-block-label" style={{ marginBottom: 8 }}>ACTIONS</div>
+                    <button className="dp-unlock-btn" onClick={handleFullAnalysis} style={{ marginBottom: 8 }}>
+                      Full Analysis
+                    </button>
+                  </>
+                )}
+                {!isCenter && !isExpanded && (
+                  <button
+                    className="dp-unlock-btn"
+                    onClick={() => onExpand(wallet.id)}
+                    style={{
+                      background: "transparent",
+                      color: "#00e5ff",
+                      border: "1px solid #00e5ff",
+                      marginLeft: profile ? 0 : 8,
+                    }}
+                  >
+                    Expand Network
+                  </button>
+                )}
+                {isExpanded && (
+                  <div className="dp-sub-text" style={{ marginTop: 8 }}>
+                    Network expanded
+                  </div>
+                )}
               </div>
             )}
 
@@ -357,18 +352,18 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
               <div className="dp-block" style={{ textAlign: "center", padding: "20px 16px" }}>
                 <div className="dp-spinner" style={{ margin: "0 auto 12px" }} />
                 <div className="dp-block-label">ANALYZING WALLET</div>
-                <div className="dp-sub-text">Fetching balance, jettons, NFTs, transactions\u2026</div>
+                <div className="dp-sub-text">Fetching balance, jettons, NFTs, transactions...</div>
               </div>
             )}
 
             {/* Error state */}
             {profileError && (
               <div className="dp-block" style={{ textAlign: "center", padding: "20px 16px" }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>\u26A0\uFE0F</div>
+                <div style={{ fontSize: 28, marginBottom: 8, color: "#f59e0b" }}>!</div>
                 <div className="dp-block-label">ANALYSIS FAILED</div>
                 <div className="dp-sub-text" style={{ marginBottom: 12 }}>{profileError}</div>
                 <button className="dp-unlock-btn" onClick={() => fetchFullAnalysis(wallet.id)}>
-                  Retry \u21BB
+                  Retry
                 </button>
               </div>
             )}
@@ -437,7 +432,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
               <div className="dp-block" style={{ borderBottom: "none" }}>
                 <div className="dp-block-label">CLASSIFICATION SIGNALS</div>
                 {profile.classification.signals.map((s, i) => (
-                  <div key={i} className="dp-signal">{"\u2022"} {s}</div>
+                  <div key={i} className="dp-signal">- {s}</div>
                 ))}
               </div>
             )}
@@ -458,7 +453,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
                   {txsWithCenter.map((tx, i) => {
                     const isSend = tx.action === "Send";
                     const col = isSend ? "#ef4444" : "#22c55e";
-                    const arrow = isSend ? "\u2197" : "\u2199";
+                    const arrow = isSend ? "OUT" : "IN";
                     const bg = isSend ? "rgba(255,23,68,.12)" : "rgba(0,230,118,.12)";
                     return (
                       <div key={"center-tx-" + i} className="dp-tx-row">
@@ -468,7 +463,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
                             {isSend ? "SENT" : "RECEIVED"}
                           </div>
                           <div className="dp-tx-token">
-                            {isSend ? "\u2192" : "\u2190"} Your Wallet
+                            {isSend ? "to" : "from"} Your Wallet
                           </div>
                         </div>
                         <div className="dp-tx-right">
@@ -493,7 +488,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
                   {otherCounterparties.slice(0, 20).map((cp) => {
                     const net = cp.totalReceived - cp.totalSent;
                     const col = net > 0 ? "#22c55e" : net < 0 ? "#ef4444" : "#c8d8ec";
-                    const arrow = net > 0 ? "\u2199" : net < 0 ? "\u2197" : "\u2194";
+                    const arrow = net > 0 ? "IN" : net < 0 ? "OUT" : "BI";
                     const bg = net > 0 ? "rgba(0,230,118,.12)" : net < 0 ? "rgba(255,23,68,.12)" : "rgba(0,229,255,.1)";
                     const balStr = profile.interacted_wallets?.[cp.address];
                     return (
@@ -505,7 +500,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
                           </div>
                           <div className="dp-tx-token">
                             {cp.txCount} tx{cp.txCount !== 1 ? "s" : ""}
-                            {balStr ? (" \u00B7 bal: " + fmtTon(Number(balStr)) + " TON") : ""}
+                            {balStr ? (" - bal: " + fmtTon(Number(balStr)) + " TON") : ""}
                           </div>
                         </div>
                         <div className="dp-tx-right">
@@ -513,7 +508,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
                             {net > 0 ? "+" : ""}{fmtTon(net)} TON
                           </div>
                           <div className="dp-tx-usd">
-                            \u2191{fmtTon(cp.totalSent)} \u2193{fmtTon(cp.totalReceived)}
+                            S:{fmtTon(cp.totalSent)} R:{fmtTon(cp.totalReceived)}
                           </div>
                         </div>
                       </div>
@@ -554,7 +549,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
         <div className="dp-footer">
           <span className="dp-footer-meta">
             {profile
-              ? (profile.recent_transactions.length + " txns \u00B7 " + jettons.length + " jettons \u00B7 " + nfts.length + " NFTs")
+              ? (profile.recent_transactions.length + " txns - " + jettons.length + " jettons - " + nfts.length + " NFTs")
               : flow
                 ? (flow.txCount + " txns with center")
                 : "connected wallet"
@@ -569,7 +564,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Pr
               else window.open(url, "_blank");
             }}
           >
-            VIEW ON EXPLORER \u2197
+            VIEW ON EXPLORER
           </button>
         </div>
       </div>

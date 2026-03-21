@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -22,7 +22,7 @@ import DetailPanel, { type CounterpartyFlow } from "./DetailPanel";
 import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
 
 /* ================================================================
-   TYPES - on-chain counterparty data
+   TYPES
 ================================================================ */
 export interface Counterparty {
   address: string;
@@ -39,7 +39,26 @@ export interface NetworkResult {
   counterparties: Counterparty[];
 }
 
-/** Minimal wallet info passed to DetailPanel / node data */
+interface RustTransaction {
+  address: string;
+  action: string;
+  amount: number;
+  timestamp: number;
+  fee: number;
+}
+
+interface WalletProfile {
+  address: string;
+  state: { address: string; balance: number; status: string; wallet_type: string | null; seqno: number | null; is_wallet: boolean } | null;
+  info: { wallet_type: string | null; seqno: number | null; account_state: string } | null;
+  jettons: any[];
+  nfts: any[];
+  dns_names: any[];
+  recent_transactions: RustTransaction[];
+  interacted_wallets: Record<string, string>;
+  classification: { kind: string; confidence: number; signals: string[] };
+}
+
 export interface WalletInfo {
   id: string;
   label: string;
@@ -56,7 +75,6 @@ const shortAddr = (addr: string) =>
 
 const nanoToTON = (n: number) => n / 1e9;
 
-/** Bubble size driven by transaction count — more txs = bigger bubble */
 const calcRadius = (txCount: number) =>
   Math.min(110, Math.max(30, 20 + Math.sqrt(txCount) * 10));
 
@@ -73,9 +91,27 @@ function classifyByTxCount(txCount: number): string {
   return "investor";
 }
 
-/** Create a deterministic edge id from two addresses (sorted) so A↔B is always one edge */
 function edgeKey(a: string, b: string) {
   return a < b ? `edge-${a}-${b}` : `edge-${b}-${a}`;
+}
+
+/** Aggregate recent_transactions into Counterparty[] */
+function aggregateTransactions(txs: RustTransaction[]): Counterparty[] {
+  const map = new Map<string, Counterparty>();
+  for (const tx of txs) {
+    if (!map.has(tx.address)) {
+      map.set(tx.address, { address: tx.address, sentNano: 0, receivedNano: 0, txCount: 0, lastSeen: tx.timestamp });
+    }
+    const cp = map.get(tx.address)!;
+    cp.txCount++;
+    cp.lastSeen = Math.max(cp.lastSeen, tx.timestamp);
+    if (tx.action === "Send") {
+      cp.sentNano += tx.amount;
+    } else {
+      cp.receivedNano += tx.amount;
+    }
+  }
+  return Array.from(map.values());
 }
 
 const THEMES: Record<string, { ring: string; glow: string; bg: string }> = {
@@ -86,7 +122,7 @@ const THEMES: Record<string, { ring: string; glow: string; bg: string }> = {
   investor: { ring: "border-cyan-400",   glow: "shadow-[0_0_22px_rgba(6,182,212,.45)]",   bg: "bg-cyan-900/60"    },
 };
 const theme = (t: string) => THEMES[t] ?? { ring: "border-slate-400", glow: "shadow-sm", bg: "bg-slate-800/60" };
-const EMOJI: Record<string, string> = { center:"\u2B50", whale:"\u25CE", trader:"\u27F3", degen:"\u26A1", investor:"\u25C8" };
+const EMOJI: Record<string, string> = { center:"C", whale:"W", trader:"T", degen:"D", investor:"I" };
 
 /* ================================================================
    CUSTOM NODE
@@ -122,7 +158,7 @@ const PersonNode = ({ data }: { data: NodeData }) => {
       style={{ width: radius * 2, height: radius * 2 }}
     >
       <span className="text-[10px] opacity-50 leading-none mb-0.5">
-        {EMOJI[classification] ?? "\u25CE"}
+        {EMOJI[classification] ?? "?"}
       </span>
       <span className="font-bold text-xs text-center px-2 w-full truncate leading-tight">
         {data.label}
@@ -152,7 +188,7 @@ const PersonNode = ({ data }: { data: NodeData }) => {
 };
 
 /* ================================================================
-   CUSTOM EDGE - stops at bubble boundary so arrow is visible
+   CUSTOM EDGE
 ================================================================ */
 const CircleEdge = ({
   id, source, target,
@@ -233,14 +269,18 @@ function saveToStorage(nodes: any[], edges: any[], centerAddress: string, expand
 }
 
 /* ================================================================
-   BUBBLE MAP - 100% On-Chain
+   BUBBLE MAP
 ================================================================ */
 export default function BubbleMap({
   searchTerm,
-  setSearchTerm
+  setSearchTerm,
+  manualAddress,
+  setManualAddress,
 }: {
   searchTerm: string;
   setSearchTerm: (val: string) => void;
+  manualAddress: string;
+  setManualAddress: (val: string) => void;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [nodes, setNodes, onNodesChange] = useNodesState([] as any[]);
@@ -251,51 +291,72 @@ export default function BubbleMap({
 
   const [expandedAddresses, setExpandedAddresses] = useState<string[]>([]);
   const [knownWallets, setKnownWallets] = useState<WalletInfo[]>([]);
-  /** Counterparty flow data keyed by address — populated from wallet-network API */
   const [counterpartyMap, setCounterpartyMap] = useState<Map<string, Counterparty>>(new Map());
+  /** Balance data from interacted_wallets (address -> nano balance) */
+  const [walletBalances, setWalletBalances] = useState<Map<string, number>>(new Map());
+  /** Track the current center address */
+  const [centerAddr, setCenterAddr] = useState<string>("");
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
 
+  // The active address is manual input first, then connected wallet
+  const activeAddress = manualAddress || userAddress || "";
+  // Track which address we last loaded so we can detect changes
+  const lastLoadedRef = useRef<string>("");
+
   const searchResults = knownWallets.filter((w) =>
     w.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  /* -- Fetch wallet network from API -- */
-  const fetchWalletNetwork = useCallback(async (address: string): Promise<NetworkResult | null> => {
+  /* -- Fetch full analysis from API -- */
+  const fetchFullAnalysis = useCallback(async (address: string): Promise<WalletProfile | null> => {
     try {
-      const res = await fetch(`http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`);
+      const res = await fetch(
+        `http://localhost:3001/api/wallet-analysis/full?address=${encodeURIComponent(address)}&network=testnet`
+      );
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Unknown error");
-      return json.result as NetworkResult;
+      return json.result as WalletProfile;
     } catch (err) {
-      console.error("fetchWalletNetwork error:", err);
+      console.error("fetchFullAnalysis error:", err);
       return null;
     }
   }, []);
 
-  /* -- Build edges from counterparty flow data (deduped by sorted pair) -- */
-  const buildEdges = useCallback((centerAddr: string, counterparties: Counterparty[]) => {
+  /* -- Build edges with correct colors and directions -- */
+  const buildEdges = useCallback((originAddr: string, counterparties: Counterparty[]) => {
     return counterparties.map((cp) => {
-      const sentTON = nanoToTON(cp.sentNano);
-      const recvTON = nanoToTON(cp.receivedNano);
+      const sentTON = nanoToTON(cp.sentNano);     // center sent TO counterparty
+      const recvTON = nanoToTON(cp.receivedNano);  // center received FROM counterparty
       const isBidirectional = sentTON > 0 && recvTON > 0;
       const isSending = sentTON > 0 && recvTON === 0;
+      // isSending = center sent to cp (red, arrow away from center)
+      // !isSending && !isBidirectional = cp sent to center (green, arrow toward center)
 
-      const color = isBidirectional ? '#a855f7' : (isSending ? '#ef4444' : '#22c55e');
+      // Green: received by center (arrow toward center)
+      // Red: sent from center (arrow away from center)
+      // Blue: bidirectional
+      const color = isBidirectional ? '#3b82f6' : (isSending ? '#ef4444' : '#22c55e');
 
       const label = isBidirectional
-        ? `\u2191 ${fmtVol(sentTON)} | \u2193 ${fmtVol(recvTON)} TON`
+        ? `S: ${fmtVol(sentTON)} | R: ${fmtVol(recvTON)} TON`
         : `${fmtVol(isSending ? sentTON : recvTON)} TON`;
 
+      // For red (sending from center): source=center, target=cp (arrow points away)
+      // For green (receiving at center): source=cp, target=center (arrow points toward center)
+      // For blue: source=center, target=cp with both markers
+      const source = isSending || isBidirectional ? originAddr : cp.address;
+      const target = isSending || isBidirectional ? cp.address : originAddr;
+
       return {
-        id: edgeKey(centerAddr, cp.address),
-        source: isSending || isBidirectional ? centerAddr : cp.address,
-        target: isSending || isBidirectional ? cp.address : centerAddr,
+        id: edgeKey(originAddr, cp.address),
+        source,
+        target,
         type: 'circle',
         animated: true,
         label,
@@ -318,23 +379,53 @@ export default function BubbleMap({
     });
   }, []);
 
-  /* -- Load the network for an address and add nodes/edges -- */
-  const loadNetwork = useCallback(async (
+  /* -- Clear all state for a fresh load -- */
+  const clearGraph = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    setSelected(null);
+    setExpandedAddresses([]);
+    setKnownWallets([]);
+    setCounterpartyMap(new Map());
+    setWalletBalances(new Map());
+    setCenterAddr("");
+    setError(null);
+    localStorage.removeItem(LS_KEY);
+  }, [setNodes, setEdges]);
+
+  /* -- Load from full analysis and add nodes/edges -- */
+  const loadFromFullAnalysis = useCallback(async (
     address: string,
     isCenter: boolean,
-    savedPositions?: Record<string, { x: number; y: number }>
   ) => {
     setLoading(true);
     setError(null);
 
-    const result = await fetchWalletNetwork(address);
-    if (!result) {
+    const profile = await fetchFullAnalysis(address);
+    if (!profile) {
       setError("Failed to fetch on-chain data. Is the API server running?");
       setLoading(false);
       return;
     }
 
-    const { counterparties } = result;
+    const counterparties = aggregateTransactions(profile.recent_transactions);
+
+    // Store balance data from interacted_wallets
+    setWalletBalances((prev) => {
+      const next = new Map(prev);
+      for (const [addr, bal] of Object.entries(profile.interacted_wallets)) {
+        next.set(addr, Number(bal));
+      }
+      // Also store this wallet's own balance
+      if (profile.state?.balance != null) {
+        next.set(address, profile.state.balance);
+      }
+      return next;
+    });
+
+    if (isCenter) {
+      setCenterAddr(address);
+    }
 
     setNodes((prevNodes: any[]) => {
       const nodeMap = new Map<string, any>();
@@ -342,27 +433,25 @@ export default function BubbleMap({
 
       // Ensure the center/expanded address node exists
       if (!nodeMap.has(address)) {
-        const centerPos = savedPositions?.[address] ?? { x: 0, y: 0 };
-        const totalTx = result.totalTxFetched;
+        const totalTx = profile.recent_transactions.length;
         nodeMap.set(address, {
           id: address,
           type: "person",
-          position: centerPos,
+          position: { x: 0, y: 0 },
           data: {
-            label: isCenter ? "My Wallet" : shortAddr(address),
+            label: isCenter ? "Center" : shortAddr(address),
             volumeTON: 0,
             radius: isCenter ? 55 : calcRadius(totalTx),
-            walletInfo: { id: address, label: isCenter ? "My Wallet" : shortAddr(address), volumeTON: 0, txCount: totalTx, isCenter },
+            walletInfo: { id: address, label: isCenter ? "Center" : shortAddr(address), volumeTON: 0, txCount: totalTx, isCenter },
             classification: isCenter ? "center" : classifyByTxCount(totalTx),
             selected: false,
             onSelect: setSelected,
           },
         });
       } else {
-        // Update existing node's txCount if it grew
         const existing = nodeMap.get(address)!;
         const oldTx = existing.data.walletInfo.txCount;
-        const newTx = Math.max(oldTx, result.totalTxFetched);
+        const newTx = Math.max(oldTx, profile.recent_transactions.length);
         if (newTx > oldTx) {
           const wi = { ...existing.data.walletInfo, txCount: newTx };
           nodeMap.set(address, {
@@ -377,16 +466,17 @@ export default function BubbleMap({
         }
       }
 
+      // Get the orbit center position from the expanded node
+      const orbitNode = nodeMap.get(address);
+      const cx = orbitNode?.position?.x ?? 0;
+      const cy = orbitNode?.position?.y ?? 0;
       const radiusOrbit = 380;
-      const centerNode = nodeMap.get(address);
-      const cx = centerNode?.position?.x ?? 0;
-      const cy = centerNode?.position?.y ?? 0;
 
       counterparties.forEach((cp, i) => {
         const volTON = nanoToTON(cp.sentNano + cp.receivedNano);
 
         if (nodeMap.has(cp.address)) {
-          // Address already on the graph — merge: accumulate txCount, grow bubble
+          // Merge into existing node
           const existing = nodeMap.get(cp.address)!;
           const oldTx = existing.data.walletInfo.txCount;
           const mergedTx = oldTx + cp.txCount;
@@ -405,15 +495,10 @@ export default function BubbleMap({
           return;
         }
 
-        // Brand-new address — create node
+        // New node
         const r = calcRadius(cp.txCount);
         const angle = (i / counterparties.length) * 2 * Math.PI;
         const jitter = (Math.random() - 0.5) * 120;
-
-        const defaultPos = {
-          x: cx + Math.cos(angle) * (radiusOrbit + jitter),
-          y: cy + Math.sin(angle) * (radiusOrbit + jitter),
-        };
 
         const walletInfo: WalletInfo = {
           id: cp.address,
@@ -426,7 +511,10 @@ export default function BubbleMap({
         nodeMap.set(cp.address, {
           id: cp.address,
           type: "person",
-          position: savedPositions?.[cp.address] ?? defaultPos,
+          position: {
+            x: cx + Math.cos(angle) * (radiusOrbit + jitter),
+            y: cy + Math.sin(angle) * (radiusOrbit + jitter),
+          },
           data: {
             label: shortAddr(cp.address),
             volumeTON: volTON,
@@ -446,6 +534,7 @@ export default function BubbleMap({
       return allNodes;
     });
 
+    // Build and merge edges (deduped)
     const newEdges = buildEdges(address, counterparties);
     setEdges((prevEdges: any[]) => {
       const existingIds = new Set(prevEdges.map((e: any) => e.id));
@@ -453,11 +542,10 @@ export default function BubbleMap({
       return [...prevEdges, ...toAdd];
     });
 
-    /* Store counterparty flow data for DetailPanel lookup */
+    // Store counterparty flow data
     setCounterpartyMap((prev) => {
       const next = new Map(prev);
       for (const cp of counterparties) {
-        // If already exists, merge counts
         const existing = next.get(cp.address);
         if (existing) {
           next.set(cp.address, {
@@ -476,20 +564,26 @@ export default function BubbleMap({
 
     setExpandedAddresses((prev) => [...prev, address]);
     setLoading(false);
-  }, [fetchWalletNetwork, buildEdges, setNodes, setEdges]);
+  }, [fetchFullAnalysis, buildEdges, setNodes, setEdges]);
 
-  /* -- 1. Initial load -- */
+  /* -- Handle expanding a secondary wallet's network -- */
+  const handleExpand = useCallback(async (address: string) => {
+    if (expandedAddresses.includes(address)) return;
+    await loadFromFullAnalysis(address, false);
+  }, [expandedAddresses, loadFromFullAnalysis]);
+
+  /* -- Initial load when activeAddress changes -- */
   useEffect(() => {
-    if (!userAddress) {
+    if (!activeAddress) {
       setNodes([{
         id: "placeholder",
         type: "person",
         position: { x: 0, y: 0 },
         data: {
-          label: "Connect Wallet",
+          label: "Enter Wallet",
           volumeTON: 0,
           radius: 55,
-          walletInfo: { id: "placeholder", label: "Connect Wallet", volumeTON: 0, txCount: 0, isCenter: true },
+          walletInfo: { id: "placeholder", label: "Enter Wallet", volumeTON: 0, txCount: 0, isCenter: true },
           classification: "center",
           selected: false,
           onSelect: () => {},
@@ -498,24 +592,17 @@ export default function BubbleMap({
       return;
     }
 
-    if (expandedAddresses.includes(userAddress)) return;
+    // Don't reload if same address
+    if (lastLoadedRef.current === activeAddress) return;
+    lastLoadedRef.current = activeAddress;
 
-    const savedState = loadSaved();
-
-    if (savedState && savedState.centerAddress !== userAddress) {
-      localStorage.removeItem(LS_KEY);
-    }
-
-    if (savedState && savedState.centerAddress === userAddress && savedState.edges.length > 0) {
-      setExpandedAddresses(savedState.expandedAddresses ?? []);
-      loadNetwork(userAddress, true, savedState.nodePositions);
-    } else {
-      loadNetwork(userAddress, true);
-    }
+    // Clear and load fresh
+    clearGraph();
+    loadFromFullAnalysis(activeAddress, true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userAddress]);
+  }, [activeAddress]);
 
-  /* -- 2. Click a node: just select it (no payment, no expand) -- */
+  /* -- Click a node: just select it -- */
   const handleSelectNode = useCallback((walletInfo: WalletInfo) => {
     if (walletInfo.id === "placeholder") return;
     setSelected(walletInfo);
@@ -527,7 +614,7 @@ export default function BubbleMap({
     handleSelectNode(wallet);
   }, [setSearchTerm, handleSelectNode]);
 
-  /* -- Update selected state -- */
+  /* -- Update selected state on nodes -- */
   useEffect(() => {
     setNodes((nds: any[]) =>
       nds.map((n: any) => ({
@@ -539,14 +626,14 @@ export default function BubbleMap({
 
   /* -- Persist state -- */
   useEffect(() => {
-    if (nodes.length > 0 && userAddress) {
-      saveToStorage(nodes, edges, userAddress, expandedAddresses);
+    if (nodes.length > 0 && activeAddress) {
+      saveToStorage(nodes, edges, activeAddress, expandedAddresses);
     }
-  }, [nodes, edges, expandedAddresses, userAddress]);
+  }, [nodes, edges, expandedAddresses, activeAddress]);
 
   return (
     <>
-      <main className="fixed left-0 sm:left-20 right-0 top-14 bottom-0 overflow-hidden"
+      <main className="fixed left-0 sm:left-20 right-0 top-24 bottom-0 overflow-hidden"
             style={{ background: "#080d14" }}>
 
         {loading && (
@@ -565,11 +652,10 @@ export default function BubbleMap({
         )}
 
         {searchTerm.length > 0 && (
-          <div className="fixed top-16 right-20 z-50 w-72 bg-[#1a2535]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+          <div className="fixed top-28 right-20 z-50 w-72 bg-[#1a2535]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
             {searchResults.length > 0 ? (
               searchResults.map((wallet) => {
                 const isExpanded = expandedAddresses.includes(wallet.id);
-
                 return (
                   <div
                     key={wallet.id}
@@ -590,11 +676,11 @@ export default function BubbleMap({
                       </span>
                     ) : (
                       <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded flex-shrink-0 ml-2">
-                        0.01 TON
+                        Click to select
                       </span>
                     )}
                   </div>
-                )
+                );
               })
             ) : (
               <div className="px-4 py-4 text-sm text-center text-slate-400">
@@ -645,7 +731,10 @@ export default function BubbleMap({
             lastSeen: cp.lastSeen,
           } as CounterpartyFlow;
         })() : null}
-        centerAddress={userAddress || null}
+        centerAddress={centerAddr || userAddress || null}
+        walletBalance={selected ? (walletBalances.get(selected.id) ?? null) : null}
+        onExpand={handleExpand}
+        isExpanded={selected ? expandedAddresses.includes(selected.id) : false}
       />
     </>
   );

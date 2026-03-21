@@ -15,7 +15,8 @@
       "Bash(curl -s \"https://testnet.toncenter.com/api/v3/walletStates?address=kQDMo9xJIt6qMhYJg5luhIK18XkRJVKUPeOgrA0ORJoTgewC\" -H \"X-API-Key: e251fe96771c8fe3e7c93798924a1b12c600aecfcc25d4b9fa9178ca15a9050d\")",
       "Bash(python -c \"import sys,json; print\\(json.dumps\\(json.load\\(sys.stdin\\), indent=2\\)\\)\")",
       "Bash(RPC_API_KEY=e251fe96771c8fe3e7c93798924a1b12c600aecfcc25d4b9fa9178ca15a9050d cargo test -- --nocapture)",
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
