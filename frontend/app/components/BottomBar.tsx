@@ -48,6 +48,58 @@ export default function BottomBar() {
   const appName    = wallet?.device?.appName ?? "TON Wallet";
   const platform   = wallet?.device?.platform ?? "";
 
+  /* ── on-chain stats ── */
+  const [stats, setStats] = useState<OnChainStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!rawAddress) { setStats(null); return; }
+
+    let cancelled = false;
+    (async () => {
+      setStatsLoading(true);
+      try {
+        const res = await fetch(
+          `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(rawAddress)}&limit=50`
+        );
+        if (!res.ok) throw new Error("API " + res.status);
+        const json = await res.json();
+        if (!json.ok || cancelled) return;
+
+        const r = json.result as {
+          center: string;
+          balanceNano: number | null;
+          totalTxFetched: number;
+          counterparties: { address: string; sentNano: number; receivedNano: number; txCount: number; lastSeen: number }[];
+        };
+
+        const cps = r.counterparties ?? [];
+        const top = cps.length > 0
+          ? cps.reduce((a, b) => (a.txCount > b.txCount ? a : b))
+          : null;
+
+        const lastActivity = cps.length > 0
+          ? Math.max(...cps.map(c => c.lastSeen))
+          : null;
+
+        if (!cancelled) {
+          setStats({
+            balanceNano: r.balanceNano,
+            totalTxFetched: r.totalTxFetched,
+            counterpartyCount: cps.length,
+            topCounterparty: top ? { address: top.address, txCount: top.txCount, volumeNano: top.sentNano + top.receivedNano } : null,
+            lastActivity,
+          });
+        }
+      } catch (err) {
+        console.error("BottomBar stats fetch error:", err);
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [rawAddress]);
+
   const handleShare = async () => {
     setBusy(true);
     try {
