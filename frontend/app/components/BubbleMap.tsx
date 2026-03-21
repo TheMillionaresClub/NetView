@@ -10,6 +10,11 @@ import {
   Handle,
   Position,
   MarkerType,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getStraightPath,
+  useNodes,
+  type EdgeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import DetailPanel, { WalletData } from "./DetailPanel";
@@ -101,6 +106,58 @@ const PersonNode = ({ data }: { data: NodeData }) => {
 };
 
 /* ════════════════════════════════════════════════════════
+   CUSTOM EDGE — stops at bubble boundary so arrow is visible
+════════════════════════════════════════════════════════ */
+const CircleEdge = ({
+  id, source, target,
+  sourceX, sourceY, targetX, targetY,
+  style, markerEnd, markerStart, label,
+}: EdgeProps) => {
+  const nodes = useNodes();
+
+  const sourceNode = nodes.find(n => n.id === source);
+  const targetNode = nodes.find(n => n.id === target);
+  const sourceRadius = ((sourceNode?.data as any)?.radius ?? 50) as number;
+  const targetRadius = ((targetNode?.data as any)?.radius ?? 50) as number;
+
+  const dx = targetX - sourceX;
+  const dy = targetY - sourceY;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+  // Trim start and end so the path only covers the space between the two circle boundaries
+  const sx = sourceX + (dx / dist) * sourceRadius;
+  const sy = sourceY + (dy / dist) * sourceRadius;
+  const tx = targetX - (dx / dist) * targetRadius;
+  const ty = targetY - (dy / dist) * targetRadius;
+
+  const [edgePath, labelX, labelY] = getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd as string} markerStart={markerStart as string} />
+      {label && (
+        <EdgeLabelRenderer>
+          <div style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            background: '#1a2535',
+            padding: '2px 8px',
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 700,
+            color: '#fff',
+            pointerEvents: 'all',
+            whiteSpace: 'nowrap',
+          }}>
+            {label as string}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+};
+
+/* ════════════════════════════════════════════════════════
    LOCAL STORAGE PERSISTENCE
 ════════════════════════════════════════════════════════ */
 const LS_KEY = "bubblemap-state";
@@ -170,6 +227,7 @@ export default function BubbleMap({
   const [unlockedWallets, setUnlockedWallets] = useState<string[]>(saved?.unlockedWallets ?? []);
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
+  const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
 
@@ -326,23 +384,33 @@ export default function BubbleMap({
       const isBidirectional = totalSent > 0 && totalReceived > 0;
       const isSending = totalSent > 0 && totalReceived === 0;
 
-      // Design dynamique
-      let color = isBidirectional ? '#a855f7' : (isSending ? '#ef4444' : '#22c55e');
-      let label = isBidirectional 
+      const color = isBidirectional ? '#a855f7' : (isSending ? '#ef4444' : '#22c55e');
+
+      const label = isBidirectional
         ? `↑ ${totalSent} | ↓ ${totalReceived} ${tokenStr}`
         : `${isSending ? totalSent : totalReceived} ${tokenStr}`;
 
       return {
         id: `edge-${wallet.id}-${targetId}`,
-        // La source est toujours celui qu'on inspecte pour la cohérence, sauf si on reçoit uniquement
         source: isSending || isBidirectional ? wallet.id : targetId,
         target: isSending || isBidirectional ? targetId : wallet.id,
+        type: 'circle',
         animated: true,
-        label: label,
+        label,
         style: { stroke: color, strokeWidth: 2.5 },
-        markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: color },
+        markerEnd: {
+          type: MarkerType.Arrow,
+          width: 25,
+          height: 25,
+          color,
+        },
         ...(isBidirectional && {
-          markerStart: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: color }
+          markerStart: {
+            type: MarkerType.Arrow,
+            width: 25,
+            height: 25,
+            color,
+          },
         }),
         labelStyle: { fill: '#fff', fontWeight: 700, fontSize: 10 },
         labelBgStyle: { fill: '#1a2535', fillOpacity: 0.9 },
@@ -444,6 +512,7 @@ export default function BubbleMap({
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onPaneClick={() => setSelected(null)}
