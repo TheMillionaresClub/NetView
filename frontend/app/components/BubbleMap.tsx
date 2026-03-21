@@ -17,7 +17,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import DetailPanel from "./DetailPanel";
+import DetailPanel, { type CounterpartyFlow } from "./DetailPanel";
 
 import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
 
@@ -251,6 +251,8 @@ export default function BubbleMap({
 
   const [expandedAddresses, setExpandedAddresses] = useState<string[]>([]);
   const [knownWallets, setKnownWallets] = useState<WalletInfo[]>([]);
+  /** Counterparty flow data keyed by address — populated from wallet-network API */
+  const [counterpartyMap, setCounterpartyMap] = useState<Map<string, Counterparty>>(new Map());
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
@@ -451,6 +453,27 @@ export default function BubbleMap({
       return [...prevEdges, ...toAdd];
     });
 
+    /* Store counterparty flow data for DetailPanel lookup */
+    setCounterpartyMap((prev) => {
+      const next = new Map(prev);
+      for (const cp of counterparties) {
+        // If already exists, merge counts
+        const existing = next.get(cp.address);
+        if (existing) {
+          next.set(cp.address, {
+            ...existing,
+            sentNano: existing.sentNano + cp.sentNano,
+            receivedNano: existing.receivedNano + cp.receivedNano,
+            txCount: existing.txCount + cp.txCount,
+            lastSeen: Math.max(existing.lastSeen, cp.lastSeen),
+          });
+        } else {
+          next.set(cp.address, cp);
+        }
+      }
+      return next;
+    });
+
     setExpandedAddresses((prev) => [...prev, address]);
     setLoading(false);
   }, [fetchWalletNetwork, buildEdges, setNodes, setEdges]);
@@ -492,53 +515,17 @@ export default function BubbleMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userAddress]);
 
-  /* -- 2. Expand a node network -- */
-  const handleExpandNode = useCallback(async (walletInfo: WalletInfo) => {
-    setSelected(walletInfo);
-
-    if (expandedAddresses.includes(walletInfo.id)) return;
+  /* -- 2. Click a node: just select it (no payment, no expand) -- */
+  const handleSelectNode = useCallback((walletInfo: WalletInfo) => {
     if (walletInfo.id === "placeholder") return;
-
-    if (!userAddress) {
-      alert("Please connect your TON wallet first!");
-      return;
-    }
-
-    try {
-      const response = await fetch(`http://localhost:3001/api/premium-content`);
-
-      if (response.status === 402) {
-        const invoice = await response.json();
-        const transaction = {
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [{
-            address: invoice.address || "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_",
-            amount: invoice.amount || "10000000",
-            payload: invoice.payload
-          }],
-        };
-        await tonConnectUI.sendTransaction(transaction);
-      }
-    } catch {
-      try {
-        const tx = {
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [{ address: "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_", amount: "10000000" }],
-        };
-        await tonConnectUI.sendTransaction(tx);
-      } catch {
-        return;
-      }
-    }
-
-    await loadNetwork(walletInfo.id, false);
-  }, [expandedAddresses, userAddress, tonConnectUI, loadNetwork]);
+    setSelected(walletInfo);
+  }, []);
 
   /* -- Search select -- */
-  const handleSearchSelect = useCallback(async (wallet: WalletInfo) => {
+  const handleSearchSelect = useCallback((wallet: WalletInfo) => {
     setSearchTerm("");
-    await handleExpandNode(wallet);
-  }, [setSearchTerm, handleExpandNode]);
+    handleSelectNode(wallet);
+  }, [setSearchTerm, handleSelectNode]);
 
   /* -- Update selected state -- */
   useEffect(() => {
@@ -626,7 +613,7 @@ export default function BubbleMap({
           onEdgesChange={onEdgesChange}
           onNodeClick={(_, node) => {
             const wi = (node.data as any).walletInfo as WalletInfo;
-            if (wi) handleExpandNode(wi);
+            if (wi) handleSelectNode(wi);
           }}
           onPaneClick={() => setSelected(null)}
           fitView
@@ -645,12 +632,20 @@ export default function BubbleMap({
           type: selected.isCenter ? "primary" : classifyByTxCount(selected.txCount),
           totalVolume: selected.volumeTON,
           totalTransactions: selected.txCount,
-          topTokens: [],
-          recentTransactions: [],
         } : null}
         onClose={() => setSelected(null)}
-        isUnlocked={selected ? expandedAddresses.includes(selected.id) : false}
-        onUnlock={() => { if (selected) handleExpandNode(selected); }}
+        flow={selected && !selected.isCenter ? (() => {
+          const cp = counterpartyMap.get(selected.id);
+          if (!cp) return null;
+          return {
+            address: cp.address,
+            sentNano: cp.sentNano,
+            receivedNano: cp.receivedNano,
+            txCount: cp.txCount,
+            lastSeen: cp.lastSeen,
+          } as CounterpartyFlow;
+        })() : null}
+        centerAddress={userAddress || null}
       />
     </>
   );
