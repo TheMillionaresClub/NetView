@@ -1,5 +1,6 @@
 pub mod types;
 pub mod transactions;
+pub mod decoder;
 
 use std::cell::LazyCell;
 
