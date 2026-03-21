@@ -6,8 +6,8 @@ export default function TopNavBar({
   searchTerm, 
   setSearchTerm 
 }: { 
-  searchTerm: string; 
-  setSearchTerm: (val: string) => void; 
+  searchTerm?: string; 
+  setSearchTerm?: (val: string) => void; 
 }) {
   return (
     <header className="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-14 bg-[#111417] border-none">
@@ -28,8 +28,8 @@ export default function TopNavBar({
             placeholder="SEARCH WALLET..."
             type="text"
             // 🆕 NOUVEAU : On relie l'input au state
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchTerm ?? ""}
+            onChange={(e) => setSearchTerm?.(e.target.value)}
           />
         </div>
         <button className="text-[#94a3b8] hover:bg-[#272A2E] transition-colors duration-150 ease-linear p-2">
