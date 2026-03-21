@@ -1,4 +1,4 @@
-import WalletConnectComp from "./WalletConnectComp";
+import TonWalletComp from "./TonWalletComp";
 
 export default function TopNavBar() {
   return (
@@ -9,7 +9,7 @@ export default function TopNavBar() {
         </span>
       </div>
       <div className="flex items-center gap-4">
-        <WalletConnectComp />
+        <TonWalletComp />
         <div className="bg-surface-container-low px-3 py-1.5 flex items-center gap-2">
           <span className="material-symbols-outlined text-sm text-outline">
             search
