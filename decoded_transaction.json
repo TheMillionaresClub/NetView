@@ -1,0 +1,59 @@
+{
+  "type": "boc_transaction",
+  "_tag": "0b0111",
+  "account": "0:fefab8344be7eaad46d849865161e56726c45b0bb08d71559843b31d3956122e",
+  "account_friendly": "EQD--rg0S-fqrUbYSYZRYeVnJsRbC7CNcVWYQ7MdOVYSLsqz",
+  "lt": 57220068000013,
+  "time": 1774098272,
+  "time_iso": "2026-03-21T13:04:32+00:00",
+  "prev_tx_hash": "b5bd25fb40bf64fcf935b1eb3bdfeb2c227df8787d2b4a864d8c4b7c7f0a6b0f",
+  "prev_tx_lt": 57220068000001,
+  "outmsg_cnt": 0,
+  "orig_status": "active",
+  "end_status": "active",
+  "in_msg": {
+    "type": "internal",
+    "bounce": true,
+    "bounced": true,
+    "src": null,
+    "dst": "ER_nANnrZXTXCHzeK6roLiznEu0mcw0j-cVt-KsyVg19qMYO",
+    "value_nano": 520093019843,
+    "value_ton": "520.093019843"
+  },
+  "out_msgs": [
+    {
+      "type": "internal",
+      "bounce": true,
+      "bounced": false,
+      "src": "EQAkagR9UOGo_L7ICfw73ftxrQQNG75CzNPGHm83Hdx7BimO",
+      "dst": "EQD--rg0S-fqrUbYSYZRYeVnJsRbC7CNcVWYQ7MdOVYSLsqz",
+      "value_nano": 164406297,
+      "value_ton": "0.164406297",
+      "comment": "Registered"
+    },
+    {
+      "type": "internal",
+      "bounce": false,
+      "bounced": false,
+      "src": "<unsupported addr tag=1>",
+      "dst": null,
+      "value_nano": 0,
+      "value_ton": "0.000000000",
+      "op": "0x40614c19"
+    },
+    {
+      "type": "internal",
+      "bounce": false,
+      "bounced": false,
+      "src": null,
+      "dst": null,
+      "value_nano": 22821600346112,
+      "value_ton": "22821.600346112"
+    },
+    {
+      "type": "external_out",
+      "src": null,
+      "dst": null
+    }
+  ]
+}
