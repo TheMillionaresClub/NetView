@@ -13,11 +13,12 @@ router.get("/", async (req, res) => {
             .json({ error: "Missing ?address= query parameter" });
     }
 
-    const txLimit = Math.min(Number(limit) || 50, 200);
+    const txLimit = Math.min(Number(limit) || 50, 500);
+    const apiKey = process.env.RPC_API_KEY ?? null;
 
     try {
         const bg = await getWalletInfoWasm();
-        const transactions = await bg.get_transactions(address, txLimit);
+        const transactions = await bg.get_transactions(address, txLimit, apiKey);
 
         return res.json({
             ok: true,
