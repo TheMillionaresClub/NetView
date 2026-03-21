@@ -1,0 +1,11 @@
+{
+  "source_wallet": "kQAKOQd9PsEbmu_CS4TWCko8cHfQbxHavCGwW6lx71IcgUt1",
+  "network": "testnet",
+  "unique_destinations": 4,
+  "addresses": [
+    "EQDg8ECFb78s66LL5MmnTZn0HKGyFRYrFNlGFgKg5vabOn-W",
+    "EQAazYzokxYo519P6xk4xTQ-jH5zhM6pUVL6MBwV8KIw-05T",
+    "EQAyni3YDAhs7c-7imWvPyEbMEeVPMX8eWDLQ5GUe-B-BrkW",
+    "EQD_N0hrgbiQzAh72500KZbYU76VOOEg5RxIu4unxZGhAdXC"
+  ]
+}
