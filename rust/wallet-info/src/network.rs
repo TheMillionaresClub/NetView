@@ -31,14 +31,6 @@ struct GetTransactionsParams<'a> {
     hash:     Option<&'a str>,
 }
 
-/// The full JSON-RPC envelope around the RPC response.
-/// We only need `result` — errors surface as a `reqwest`/`serde` error.
-#[derive(Debug, Deserialize)]
-struct JsonRpcEnvelope {
-    #[serde(flatten)]
-    inner: RpcResponse,
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // Network selector
 // ═══════════════════════════════════════════════════════════════════
@@ -56,11 +48,11 @@ impl Network {
             Network::Testnet => TESTNET,
         }
     }
-    
+
     pub fn balance_url(&self) -> &str {
         match self {
             Network::Mainnet => "https://www.toncenter.com/api/v3/addressInformation",
-            Network::Testnet => "https://testnet.toncenter.com/api/v3/addressInformation"
+            Network::Testnet => "https://testnet.toncenter.com/api/v3/addressInformation",
         }
     }
 }
@@ -79,88 +71,92 @@ pub enum RpcError {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Main function
+// Page result
 // ═══════════════════════════════════════════════════════════════════
 
+/// Result of a single page fetch.
+pub struct PageResult {
+    pub transactions: Vec<Transaction>,
+    /// (lt, hash) cursor pointing at the last tx in this page.
+    /// `None` means this was the last page (fewer results than requested).
+    pub next_cursor: Option<(u64, String)>,
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Single-page fetch  (pagination handled by the TypeScript layer)
+// ═══════════════════════════════════════════════════════════════════
+
+/// toncenter v2 hard cap per request.
 const PAGE_SIZE: u32 = 100;
 
-/// Fetch up to `limit` transactions for `address` and return them as
-/// a `Vec<Transaction>` with `action`, `amount`, `timestamp`, `fee`.
+/// Fetch one page of up to `limit` (max 100) transactions.
 ///
-/// Automatically paginates using the `(lt, hash)` cursor when `limit > 100`,
-/// since the toncenter v2 API caps each page at 100 transactions.
-/// Pass `api_key` to authenticate and get a higher rate limit.
-pub async fn get_transactions(
+/// Pass `cursor` as `Some((lt, hash))` to start from a previous page's
+/// last transaction — the TypeScript SSE route chains these calls with a
+/// delay to avoid rate-limiting.
+pub async fn get_transactions_page(
     client:  &Client,
     network: &Network,
     address: &str,
     limit:   u32,
+    cursor:  Option<(u64, &str)>,
     api_key: Option<&str>,
-) -> Result<Vec<Transaction>, RpcError> {
-    let mut all_txs: Vec<Transaction> = Vec::new();
-    // (lt, hash) cursor — None means "start from the most recent transaction"
-    let mut cursor: Option<(u64, String)> = None;
+) -> Result<PageResult, RpcError> {
+    let page_size = limit.min(PAGE_SIZE);
 
-    loop {
-        let remaining = limit.saturating_sub(all_txs.len() as u32);
-        if remaining == 0 {
-            break;
-        }
-        let page_limit = remaining.min(PAGE_SIZE);
+    let body = JsonRpcRequest {
+        jsonrpc: "2.0",
+        id:      1,
+        method:  "getTransactions",
+        params:  GetTransactionsParams {
+            address,
+            limit:    page_size,
+            archival: true,
+            lt:   cursor.map(|(lt, _)| lt),
+            hash: cursor.map(|(_, h)| h),
+        },
+    };
 
-        let body = JsonRpcRequest {
-            jsonrpc: "2.0",
-            id:      1,
-            method:  "getTransactions",
-            params:  GetTransactionsParams {
-                address,
-                limit:    page_limit,
-                archival: true,
-                lt:       cursor.as_ref().map(|(lt, _)| *lt),
-                hash:     cursor.as_ref().map(|(_, h)| h.as_str()),
-            },
-        };
+    let mut req = client.post(network.url()).json(&body);
+    if let Some(key) = api_key {
+        req = req.header("X-API-Key", key);
+    }
+    let response: RpcResponse = req
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
 
-        let mut req = client.post(network.url()).json(&body);
-        if let Some(key) = api_key {
-            req = req.header("X-API-Key", key);
-        }
-        let response: RpcResponse = req
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-
-        if !response.ok {
-            return Err(RpcError::ApiError);
-        }
-
-        let ext_txs = &response.result;
-
-        // The API re-returns the cursor transaction as the first result of
-        // subsequent pages — skip it to avoid duplicates.
-        let page = if cursor.is_some() && !ext_txs.is_empty() {
-            &ext_txs[1..]
-        } else {
-            ext_txs.as_slice()
-        };
-
-        if page.is_empty() {
-            break;
-        }
-
-        // Update cursor to the last (oldest) transaction on this page.
-        let last = ext_txs.last().unwrap();
-        cursor = Some((last.transaction_id.lt, last.transaction_id.hash.clone()));
-
-        all_txs.extend(extract_transactions_from_slice(page));
-
-        // If we got fewer results than requested this was the last page.
-        if (ext_txs.len() as u32) < page_limit {
-            break;
-        }
+    if !response.ok {
+        return Err(RpcError::ApiError);
     }
 
-    Ok(all_txs)
+    let ext_txs = response.result;
+    if ext_txs.is_empty() {
+        return Ok(PageResult { transactions: vec![], next_cursor: None });
+    }
+
+    // The cursor for the next page is the oldest tx in this page (last element).
+    let last = ext_txs.last().unwrap();
+    let next_cursor = if (ext_txs.len() as u32) < page_size {
+        None // Fewer results than requested → this is the last page.
+    } else {
+        Some((last.transaction_id.lt, last.transaction_id.hash.clone()))
+    };
+
+    // Skip index 0 on pages 2+ — the API re-returns the cursor tx as the
+    // first element of each subsequent page to allow deduplication.
+    let new_txs = if cursor.is_some() && ext_txs.len() > 1 {
+        &ext_txs[1..]
+    } else if cursor.is_some() {
+        &ext_txs[0..0] // cursor tx was the only result — nothing new
+    } else {
+        &ext_txs[..]
+    };
+
+    Ok(PageResult {
+        transactions: extract_transactions_from_slice(new_txs),
+        next_cursor,
+    })
 }

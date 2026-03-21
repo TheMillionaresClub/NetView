@@ -2,9 +2,10 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const get_address_information: (a: number, b: number) => any;
-export const get_transactions: (a: number, b: number, c: number, d: number, e: number) => any;
-export const wasm_bindgen__closure__destroy__h2ff29d065b6acb89: (a: number, b: number) => void;
-export const wasm_bindgen__convert__closures_____invoke__h06bad8edf3ccd1c6: (a: number, b: number, c: any) => [number, number];
+export const get_transactions: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => any;
+export const analyze_wallet: (a: number, b: number, c: number, d: number, e: number, f: number) => any;
+export const wasm_bindgen__closure__destroy__ha6766aa722118a08: (a: number, b: number) => void;
+export const wasm_bindgen__convert__closures_____invoke__h80556c7c89519524: (a: number, b: number, c: any) => [number, number];
 export const wasm_bindgen__convert__closures_____invoke__h6c7d34b745761d58: (a: number, b: number, c: any, d: any) => void;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

@@ -1,6 +1,21 @@
 /* tslint:disable */
 /* eslint-disable */
 
+/**
+ * Fetch a full wallet profile: identity, balance, tokens, NFTs, DNS,
+ * recent transactions (100), and a heuristic classification.
+ *
+ * `network` — `"mainnet"` or `"testnet"` (default: testnet)
+ */
+export function analyze_wallet(address: string, network?: string | null, api_key?: string | null): Promise<any>;
+
 export function get_address_information(address: string): Promise<string>;
 
-export function get_transactions(address: string, limit: number, api_key?: string | null): Promise<any>;
+/**
+ * Fetch one page of transactions (max 100).
+ *
+ * Pass `lt` + `hash` from the previous call's `next_lt` / `next_hash` to
+ * continue from where you left off.  When `next_lt` is `null` in the
+ * response there are no more pages.
+ */
+export function get_transactions(address: string, limit: number, lt?: string | null, hash?: string | null, api_key?: string | null): Promise<any>;

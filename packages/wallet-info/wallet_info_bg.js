@@ -1,4 +1,25 @@
 /**
+ * Fetch a full wallet profile: identity, balance, tokens, NFTs, DNS,
+ * recent transactions (100), and a heuristic classification.
+ *
+ * `network` — `"mainnet"` or `"testnet"` (default: testnet)
+ * @param {string} address
+ * @param {string | null} [network]
+ * @param {string | null} [api_key]
+ * @returns {Promise<any>}
+ */
+export function analyze_wallet(address, network, api_key) {
+    const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    var ptr1 = isLikeNone(network) ? 0 : passStringToWasm0(network, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len1 = WASM_VECTOR_LEN;
+    var ptr2 = isLikeNone(api_key) ? 0 : passStringToWasm0(api_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len2 = WASM_VECTOR_LEN;
+    const ret = wasm.analyze_wallet(ptr0, len0, ptr1, len1, ptr2, len2);
+    return ret;
+}
+
+/**
  * @param {string} address
  * @returns {Promise<string>}
  */
@@ -10,22 +31,40 @@ export function get_address_information(address) {
 }
 
 /**
+ * Fetch one page of transactions (max 100).
+ *
+ * Pass `lt` + `hash` from the previous call's `next_lt` / `next_hash` to
+ * continue from where you left off.  When `next_lt` is `null` in the
+ * response there are no more pages.
  * @param {string} address
  * @param {number} limit
+ * @param {string | null} [lt]
+ * @param {string | null} [hash]
  * @param {string | null} [api_key]
  * @returns {Promise<any>}
  */
-export function get_transactions(address, limit, api_key) {
+export function get_transactions(address, limit, lt, hash, api_key) {
     const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
-    var ptr1 = isLikeNone(api_key) ? 0 : passStringToWasm0(api_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var ptr1 = isLikeNone(lt) ? 0 : passStringToWasm0(lt, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len1 = WASM_VECTOR_LEN;
-    const ret = wasm.get_transactions(ptr0, len0, limit, ptr1, len1);
+    var ptr2 = isLikeNone(hash) ? 0 : passStringToWasm0(hash, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len2 = WASM_VECTOR_LEN;
+    var ptr3 = isLikeNone(api_key) ? 0 : passStringToWasm0(api_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    var len3 = WASM_VECTOR_LEN;
+    const ret = wasm.get_transactions(ptr0, len0, limit, ptr1, len1, ptr2, len2, ptr3, len3);
     return ret;
 }
 export function __wbg_Error_83742b46f01ce22d(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return ret;
+}
+export function __wbg_String_8564e559799eccda(arg0, arg1) {
+    const ret = String(arg1);
+    const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
+    getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+    getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
 }
 export function __wbg___wbindgen_debug_string_5398f5bb970e0daa(arg0, arg1) {
     const ret = debugString(arg1);
@@ -239,6 +278,10 @@ export function __wbg_stringify_5ae93966a84901ac() { return handleError(function
     const ret = JSON.stringify(arg0);
     return ret;
 }, arguments); }
+export function __wbg_text_372f5b91442c50f9() { return handleError(function (arg0) {
+    const ret = arg0.text();
+    return ret;
+}, arguments); }
 export function __wbg_then_098abe61755d12f6(arg0, arg1) {
     const ret = arg0.then(arg1);
     return ret;
@@ -259,8 +302,8 @@ export function __wbg_value_21fc78aab0322612(arg0) {
     return ret;
 }
 export function __wbindgen_cast_0000000000000001(arg0, arg1) {
-    // Cast intrinsic for `Closure(Closure { dtor_idx: 142, function: Function { arguments: [Externref], shim_idx: 143, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-    const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h2ff29d065b6acb89, wasm_bindgen__convert__closures_____invoke__h06bad8edf3ccd1c6);
+    // Cast intrinsic for `Closure(Closure { dtor_idx: 177, function: Function { arguments: [Externref], shim_idx: 178, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+    const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__ha6766aa722118a08, wasm_bindgen__convert__closures_____invoke__h80556c7c89519524);
     return ret;
 }
 export function __wbindgen_cast_0000000000000002(arg0) {
@@ -292,8 +335,8 @@ export function __wbindgen_init_externref_table() {
     table.set(offset + 2, true);
     table.set(offset + 3, false);
 }
-function wasm_bindgen__convert__closures_____invoke__h06bad8edf3ccd1c6(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen__convert__closures_____invoke__h06bad8edf3ccd1c6(arg0, arg1, arg2);
+function wasm_bindgen__convert__closures_____invoke__h80556c7c89519524(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen__convert__closures_____invoke__h80556c7c89519524(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
