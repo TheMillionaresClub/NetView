@@ -20,7 +20,7 @@ export default function SideNavBar() {
   };
 
   return (
-    <nav className="fixed left-0 top-14 bottom-0 w-20 flex flex-col items-center py-4 z-40 bg-[#0B0E11] font-body tabular-nums">
+    <nav className="hidden sm:flex fixed left-0 top-14 bottom-0 w-20 flex-col items-center py-4 z-40 bg-[#0B0E11] font-body tabular-nums">
       <div className="mb-8 text-center">
         <div className="text-[#00E5FF] font-black text-[10px] uppercase tracking-tighter mb-1">
           NetView

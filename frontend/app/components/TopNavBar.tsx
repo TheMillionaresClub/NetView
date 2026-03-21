@@ -39,7 +39,7 @@ export default function TopNavBar({
       </div>
       <div className="flex items-center gap-4">
         <TonWalletComp />
-        <div className="bg-surface-container-low px-3 py-1.5 flex items-center gap-2">
+        <div className="hidden sm:flex bg-surface-container-low px-3 py-1.5 items-center gap-2">
           <span className="material-symbols-outlined text-sm text-outline">search</span>
           <input
             className="bg-transparent border-none text-xs font-headline tracking-widest focus:ring-0 w-32 md:w-64 uppercase text-on-surface-variant placeholder:text-on-surface-variant/50 outline-none"

@@ -402,7 +402,7 @@ export default function BubbleMap({
 
   return (
     <>
-      <main className="fixed left-20 right-0 top-14 bottom-0 overflow-hidden"
+      <main className="fixed left-0 sm:left-20 right-0 top-14 bottom-0 overflow-hidden"
             style={{ background: "#080d14" }}>
         
         {searchTerm.length > 0 && (

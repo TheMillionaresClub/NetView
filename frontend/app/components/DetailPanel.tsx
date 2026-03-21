@@ -318,6 +318,15 @@ const CSS = `
   box-shadow: 0 32px 80px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.04);
   animation: dp-in .2s cubic-bezier(.4,0,.2,1) both;
 }
+@media (max-width: 639px) {
+  .dp-card {
+    bottom: 0; left: 0;
+    transform: none;
+    width: 100%;
+    max-height: 80vh;
+    border-radius: 14px 14px 0 0;
+  }
+}
 
 .dp-header {
   display: flex; align-items: flex-start; gap: 12px;
@@ -391,6 +400,13 @@ const CSS = `
 .dp-col::-webkit-scrollbar-thumb { background: #1c2d42; }
 .dp-col-right { flex: 1.1; }
 .dp-col-sep { width: 1px; background: #1c2d42; flex-shrink: 0; }
+@media (max-width: 639px) {
+  .dp-body { flex-direction: column; overflow-y: auto; }
+  .dp-col  { overflow-y: visible; flex: none; }
+  .dp-col-right { flex: none; }
+  .dp-col-sep { width: 100%; height: 1px; }
+  .dp-big-number { font-size: 22px; }
+}
 
 .dp-block {
   padding: 14px 16px;
