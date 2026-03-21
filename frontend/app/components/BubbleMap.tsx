@@ -269,6 +269,124 @@ function saveToStorage(nodes: any[], edges: any[], centerAddress: string, expand
 }
 
 /* ================================================================
+   FORCE-DIRECTED LAYOUT  (Coggle-style realign)
+   Pure frontend — no external deps. Iterative simulation:
+   1. Repulsion between every pair of nodes (scaled by radius)
+   2. Spring attraction along edges
+   3. Gentle gravity toward the center node
+================================================================ */
+function forceLayout(
+  nodes: any[],
+  edges: any[],
+  iterations = 120,
+): any[] {
+  if (nodes.length < 2) return nodes;
+
+  // Work on a mutable copy of positions
+  type Vec = { x: number; y: number };
+  const pos: Record<string, Vec> = {};
+  const radii: Record<string, number> = {};
+  const ids: string[] = [];
+
+  for (const n of nodes) {
+    pos[n.id] = { x: n.position.x, y: n.position.y };
+    radii[n.id] = ((n.data as any)?.radius ?? 40) as number;
+    ids.push(n.id);
+  }
+
+  // Find center node (isCenter) for gravity anchor
+  const centerNode = nodes.find((n: any) => n.data?.walletInfo?.isCenter);
+  const centerId = centerNode?.id ?? ids[0];
+
+  // Build adjacency from edges
+  const adj = new Set<string>();
+  for (const e of edges) {
+    adj.add(`${e.source}|${e.target}`);
+    adj.add(`${e.target}|${e.source}`);
+  }
+
+  const REPULSION = 80_000;      // repulsion strength
+  const SPRING_K = 0.008;        // edge spring stiffness
+  const SPRING_LEN = 350;        // ideal edge length
+  const GRAVITY = 0.002;         // pull toward center
+  const DAMPING = 0.92;          // velocity damping
+  const MIN_DIST = 20;           // avoid division by zero
+  const MAX_FORCE = 60;          // clamp per-axis force
+
+  const vel: Record<string, Vec> = {};
+  for (const id of ids) vel[id] = { x: 0, y: 0 };
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const temp = 1 - iter / iterations; // cooling
+    const forces: Record<string, Vec> = {};
+    for (const id of ids) forces[id] = { x: 0, y: 0 };
+
+    // 1. Repulsion (every pair)
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i], b = ids[j];
+        let dx = pos[a].x - pos[b].x;
+        let dy = pos[a].y - pos[b].y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MIN_DIST) { dx = (Math.random() - 0.5) * 40; dy = (Math.random() - 0.5) * 40; dist = MIN_DIST; }
+
+        // Extra repulsion when circles overlap
+        const overlap = (radii[a] + radii[b] + 30) - dist;
+        const overlapMult = overlap > 0 ? 1 + overlap * 0.05 : 1;
+
+        const f = (REPULSION * overlapMult) / (dist * dist);
+        const fx = (dx / dist) * f;
+        const fy = (dy / dist) * f;
+        forces[a].x += fx; forces[a].y += fy;
+        forces[b].x -= fx; forces[b].y -= fy;
+      }
+    }
+
+    // 2. Edge springs
+    for (const e of edges) {
+      const a = e.source as string;
+      const b = e.target as string;
+      if (!pos[a] || !pos[b]) continue;
+      const dx = pos[b].x - pos[a].x;
+      const dy = pos[b].y - pos[a].y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || MIN_DIST;
+      const displacement = dist - SPRING_LEN;
+      const f = SPRING_K * displacement;
+      const fx = (dx / dist) * f;
+      const fy = (dy / dist) * f;
+      forces[a].x += fx; forces[a].y += fy;
+      forces[b].x -= fx; forces[b].y -= fy;
+    }
+
+    // 3. Gravity toward center node
+    const cx = pos[centerId]?.x ?? 0;
+    const cy = pos[centerId]?.y ?? 0;
+    for (const id of ids) {
+      if (id === centerId) continue;
+      forces[id].x -= (pos[id].x - cx) * GRAVITY;
+      forces[id].y -= (pos[id].y - cy) * GRAVITY;
+    }
+
+    // 4. Apply forces with damping & cooling
+    for (const id of ids) {
+      if (id === centerId) continue; // pin center
+      const fx = Math.max(-MAX_FORCE, Math.min(MAX_FORCE, forces[id].x)) * temp;
+      const fy = Math.max(-MAX_FORCE, Math.min(MAX_FORCE, forces[id].y)) * temp;
+      vel[id].x = (vel[id].x + fx) * DAMPING;
+      vel[id].y = (vel[id].y + fy) * DAMPING;
+      pos[id].x += vel[id].x;
+      pos[id].y += vel[id].y;
+    }
+  }
+
+  // Return nodes with updated positions
+  return nodes.map((n: any) => ({
+    ...n,
+    position: { x: Math.round(pos[n.id].x), y: Math.round(pos[n.id].y) },
+  }));
+}
+
+/* ================================================================
    BUBBLE MAP
 ================================================================ */
 export default function BubbleMap({
@@ -624,6 +742,14 @@ export default function BubbleMap({
     );
   }, [selected, setNodes]);
 
+  /* -- Force layout: realign nodes to avoid overlap -- */
+  const handleRealign = useCallback(() => {
+    setNodes((currentNodes: any[]) => {
+      const updated = forceLayout(currentNodes, edges);
+      return updated;
+    });
+  }, [edges, setNodes]);
+
   /* -- Persist state -- */
   useEffect(() => {
     if (nodes.length > 0 && activeAddress) {
@@ -708,6 +834,23 @@ export default function BubbleMap({
         >
           <Background color="#1a2535" gap={26} size={1} />
           <Controls />
+
+          {/* Realign button */}
+          {nodes.length > 1 && (
+            <div className="absolute bottom-3 left-14 z-10">
+              <button
+                onClick={handleRealign}
+                title="Auto-layout: spread overlapping nodes"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold font-mono uppercase tracking-widest
+                           bg-[#0b1421]/90 border border-[#1c2d42] text-[#4a6080] rounded
+                           hover:border-[#00e5ff] hover:text-[#00e5ff] transition-all cursor-pointer
+                           backdrop-blur-sm shadow-lg"
+              >
+                <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                Realign
+              </button>
+            </div>
+          )}
         </ReactFlow>
       </main>
 
