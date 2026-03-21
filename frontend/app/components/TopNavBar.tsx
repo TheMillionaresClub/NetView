@@ -32,9 +32,6 @@ export default function TopNavBar({
             onChange={(e) => setSearchTerm?.(e.target.value)}
           />
         </div>
-        <button className="text-[#94a3b8] hover:bg-[#272A2E] transition-colors duration-150 ease-linear p-2">
-          <span className="material-symbols-outlined">search</span>
-        </button>
       </div>
     </header>
   );
