@@ -31,6 +31,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@ton-community/assets-sdk": "^0.0.5"
+    "@ton-community/assets-sdk": "^0.0.5",
+    "wallet-info": "link:packages\\wallet-info"
   }
 }
