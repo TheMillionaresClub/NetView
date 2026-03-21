@@ -45,9 +45,6 @@ importers:
       express:
         specifier: ^4.21.0
         version: 4.22.1
-      wallet-info:
-        specifier: workspace:*
-        version: link:../packages/wallet-info
     devDependencies:
       '@types/cors':
         specifier: ^2.8.17
@@ -223,8 +220,6 @@ importers:
       '@ton-x402/core':
         specifier: workspace:*
         version: link:../core
-
-  packages/wallet-info: {}
 
 packages:
 
