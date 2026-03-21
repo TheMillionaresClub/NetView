@@ -145,12 +145,26 @@ pub enum MsgData {
         body:       DecodedBoc,
         init_state: String,
     },
+    /// `msg.dataText` — plain text message body.
+    #[serde(rename = "msg.dataText")]
+    Text {
+        text: String,
+    },
+    /// `msg.dataEmpty` — no message body.
+    #[serde(rename = "msg.dataEmpty")]
+    Empty,
+    /// Catch-all for any other unknown message data types.
+    #[serde(other)]
+    Unknown,
 }
 
 impl MsgData {
-    pub fn body(&self) -> &DecodedBoc {
+    pub fn body_value(&self) -> Value {
         match self {
-            MsgData::Raw { body, .. } => body,
+            MsgData::Raw { body, .. } => body.0.clone(),
+            MsgData::Text { text } => Value::String(text.clone()),
+            MsgData::Empty => Value::Null,
+            MsgData::Unknown => Value::Null,
         }
     }
 }

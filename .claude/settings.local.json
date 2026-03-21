@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls C:/Users/ayfmp/Documents/projects/hackathon/bsa-ton/NetView/packages/wallet-info/*.js)",
+      "Bash(wasm-pack --version)",
+      "Bash(rustup target:*)",
+      "Bash(wasm-pack build:*)",
+      "Bash(taskkill //PID 35920 //F)",
+      "Bash(netstat -ano)",
+      "Bash(pnpm dev:api)",
+      "Bash(curl -s \"http://localhost:3001/api/wallet-transactions?address=0QD-F8oMBbR7p3SCMbGFQZOuxyNmu_-Kf9ilGmeSSC9IyFwz&limit=5\")"
+    ]
+  }
+}
