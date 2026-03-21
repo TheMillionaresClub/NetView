@@ -56,8 +56,9 @@ const shortAddr = (addr: string) =>
 
 const nanoToTON = (n: number) => n / 1e9;
 
-const calcRadius = (volumeTON: number) =>
-  Math.min(100, Math.max(28, Math.sqrt(volumeTON) * 8));
+/** Bubble size driven by transaction count — more txs = bigger bubble */
+const calcRadius = (txCount: number) =>
+  Math.min(110, Math.max(30, 20 + Math.sqrt(txCount) * 10));
 
 function fmtVol(v: number) {
   if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
@@ -65,11 +66,16 @@ function fmtVol(v: number) {
   return v.toFixed(2);
 }
 
-function classifyVolume(volTON: number): string {
-  if (volTON >= 1000) return "whale";
-  if (volTON >= 100) return "trader";
-  if (volTON >= 10) return "degen";
+function classifyByTxCount(txCount: number): string {
+  if (txCount >= 50) return "whale";
+  if (txCount >= 20) return "trader";
+  if (txCount >= 5) return "degen";
   return "investor";
+}
+
+/** Create a deterministic edge id from two addresses (sorted) so A↔B is always one edge */
+function edgeKey(a: string, b: string) {
+  return a < b ? `edge-${a}-${b}` : `edge-${b}-${a}`;
 }
 
 const THEMES: Record<string, { ring: string; glow: string; bg: string }> = {
@@ -123,7 +129,7 @@ const PersonNode = ({ data }: { data: NodeData }) => {
       </span>
       {!isCenter && (
         <span className="text-[10px] opacity-75 font-mono mt-0.5 tracking-wide">
-          {fmtVol(data.volumeTON)} TON
+          {walletInfo.txCount} tx{walletInfo.txCount !== 1 ? "s" : ""}
         </span>
       )}
 
@@ -270,7 +276,7 @@ export default function BubbleMap({
     }
   }, []);
 
-  /* -- Build edges from counterparty flow data -- */
+  /* -- Build edges from counterparty flow data (deduped by sorted pair) -- */
   const buildEdges = useCallback((centerAddr: string, counterparties: Counterparty[]) => {
     return counterparties.map((cp) => {
       const sentTON = nanoToTON(cp.sentNano);
@@ -285,7 +291,7 @@ export default function BubbleMap({
         : `${fmtVol(isSending ? sentTON : recvTON)} TON`;
 
       return {
-        id: `edge-${centerAddr}-${cp.address}`,
+        id: edgeKey(centerAddr, cp.address),
         source: isSending || isBidirectional ? centerAddr : cp.address,
         target: isSending || isBidirectional ? cp.address : centerAddr,
         type: 'circle',
@@ -329,38 +335,78 @@ export default function BubbleMap({
     const { counterparties } = result;
 
     setNodes((prevNodes: any[]) => {
-      const existingIds = new Set(prevNodes.map((n: any) => n.id));
-      const newNodes: any[] = [];
+      const nodeMap = new Map<string, any>();
+      for (const n of prevNodes) nodeMap.set(n.id, n);
 
-      if (!existingIds.has(address)) {
+      // Ensure the center/expanded address node exists
+      if (!nodeMap.has(address)) {
         const centerPos = savedPositions?.[address] ?? { x: 0, y: 0 };
-        newNodes.push({
+        const totalTx = result.totalTxFetched;
+        nodeMap.set(address, {
           id: address,
           type: "person",
           position: centerPos,
           data: {
             label: isCenter ? "My Wallet" : shortAddr(address),
             volumeTON: 0,
-            radius: isCenter ? 55 : 40,
-            walletInfo: { id: address, label: isCenter ? "My Wallet" : shortAddr(address), volumeTON: 0, txCount: 0, isCenter },
-            classification: isCenter ? "center" : "trader",
+            radius: isCenter ? 55 : calcRadius(totalTx),
+            walletInfo: { id: address, label: isCenter ? "My Wallet" : shortAddr(address), volumeTON: 0, txCount: totalTx, isCenter },
+            classification: isCenter ? "center" : classifyByTxCount(totalTx),
             selected: false,
             onSelect: setSelected,
           },
         });
+      } else {
+        // Update existing node's txCount if it grew
+        const existing = nodeMap.get(address)!;
+        const oldTx = existing.data.walletInfo.txCount;
+        const newTx = Math.max(oldTx, result.totalTxFetched);
+        if (newTx > oldTx) {
+          const wi = { ...existing.data.walletInfo, txCount: newTx };
+          nodeMap.set(address, {
+            ...existing,
+            data: {
+              ...existing.data,
+              radius: existing.data.walletInfo.isCenter ? 55 : calcRadius(newTx),
+              walletInfo: wi,
+              classification: existing.data.walletInfo.isCenter ? "center" : classifyByTxCount(newTx),
+            },
+          });
+        }
       }
 
       const radiusOrbit = 380;
+      const centerNode = nodeMap.get(address);
+      const cx = centerNode?.position?.x ?? 0;
+      const cy = centerNode?.position?.y ?? 0;
+
       counterparties.forEach((cp, i) => {
-        if (existingIds.has(cp.address)) return;
         const volTON = nanoToTON(cp.sentNano + cp.receivedNano);
-        const r = calcRadius(volTON);
+
+        if (nodeMap.has(cp.address)) {
+          // Address already on the graph — merge: accumulate txCount, grow bubble
+          const existing = nodeMap.get(cp.address)!;
+          const oldTx = existing.data.walletInfo.txCount;
+          const mergedTx = oldTx + cp.txCount;
+          const mergedVol = existing.data.walletInfo.volumeTON + volTON;
+          const wi: WalletInfo = { ...existing.data.walletInfo, txCount: mergedTx, volumeTON: mergedVol };
+          nodeMap.set(cp.address, {
+            ...existing,
+            data: {
+              ...existing.data,
+              volumeTON: mergedVol,
+              radius: existing.data.walletInfo.isCenter ? 55 : calcRadius(mergedTx),
+              walletInfo: wi,
+              classification: existing.data.walletInfo.isCenter ? "center" : classifyByTxCount(mergedTx),
+            },
+          });
+          return;
+        }
+
+        // Brand-new address — create node
+        const r = calcRadius(cp.txCount);
         const angle = (i / counterparties.length) * 2 * Math.PI;
         const jitter = (Math.random() - 0.5) * 120;
-
-        const centerNode = prevNodes.find((n: any) => n.id === address);
-        const cx = centerNode?.position?.x ?? 0;
-        const cy = centerNode?.position?.y ?? 0;
 
         const defaultPos = {
           x: cx + Math.cos(angle) * (radiusOrbit + jitter),
@@ -375,7 +421,7 @@ export default function BubbleMap({
           isCenter: false,
         };
 
-        newNodes.push({
+        nodeMap.set(cp.address, {
           id: cp.address,
           type: "person",
           position: savedPositions?.[cp.address] ?? defaultPos,
@@ -384,20 +430,18 @@ export default function BubbleMap({
             volumeTON: volTON,
             radius: r,
             walletInfo,
-            classification: classifyVolume(volTON),
+            classification: classifyByTxCount(cp.txCount),
             selected: false,
             onSelect: setSelected,
           },
         });
       });
 
-      const allWallets: WalletInfo[] = [
-        ...prevNodes.map((n: any) => n.data.walletInfo),
-        ...newNodes.map((n: any) => n.data.walletInfo),
-      ];
+      const allNodes = Array.from(nodeMap.values());
+      const allWallets: WalletInfo[] = allNodes.map((n: any) => n.data.walletInfo);
       setKnownWallets(allWallets);
 
-      return [...prevNodes, ...newNodes];
+      return allNodes;
     });
 
     const newEdges = buildEdges(address, counterparties);
@@ -598,7 +642,7 @@ export default function BubbleMap({
         wallet={selected ? {
           id: selected.id,
           name: selected.label,
-          type: selected.isCenter ? "primary" : classifyVolume(selected.volumeTON),
+          type: selected.isCenter ? "primary" : classifyByTxCount(selected.txCount),
           totalVolume: selected.volumeTON,
           totalTransactions: selected.txCount,
           topTokens: [],
