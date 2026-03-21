@@ -13,22 +13,28 @@ const jokes = [
     "What's a TON validator's favorite exercise? Proof of stake-outs.",
 ];
 
-const handler = (_request: Request) => {
-    const joke = jokes[Math.floor(Math.random() * jokes.length)];
-    return Response.json({ joke, timestamp: new Date().toISOString() });
-};
+let gatedHandler: ReturnType<typeof paymentGate> | null = null;
 
-const gatedHandler = paymentGate(handler, {
-    config: getPaymentConfig({
-        amount: "10000000", // 0.01 BSA USD (9 decimals)
-        asset:
-            process.env.JETTON_MASTER_ADDRESS ||
-            "kQCd6G7c_HUBkgwtmGzpdqvHIQoNkYOEE0kSWoc5v57hPPnW",
-        description: "Random developer joke (0.01 BSA USD)",
-        decimals: 9,
-    }),
-});
+function getHandler() {
+    if (!gatedHandler) {
+        const handler = (_request: Request) => {
+            const joke = jokes[Math.floor(Math.random() * jokes.length)];
+            return Response.json({ joke, timestamp: new Date().toISOString() });
+        };
+        gatedHandler = paymentGate(handler, {
+            config: getPaymentConfig({
+                amount: "10000000",
+                asset:
+                    process.env.JETTON_MASTER_ADDRESS ||
+                    "kQCd6G7c_HUBkgwtmGzpdqvHIQoNkYOEE0kSWoc5v57hPPnW",
+                description: "Random developer joke (0.01 BSA USD)",
+                decimals: 9,
+            }),
+        });
+    }
+    return gatedHandler;
+}
 
-router.get("/", webToExpress(gatedHandler));
+router.get("/", webToExpress((req) => getHandler()(req)));
 
 export default router;
