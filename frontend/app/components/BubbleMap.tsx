@@ -456,7 +456,12 @@ export default function BubbleMap({
         </ReactFlow>
       </main>
 
-      <DetailPanel wallet={selected} onClose={() => setSelected(null)} />
+      <DetailPanel
+        wallet={selected}
+        onClose={() => setSelected(null)}
+        isUnlocked={selected?.id === "me" || unlockedWallets.includes(selected?.id ?? "")}
+        onUnlock={() => { if (selected) handleSearchSelect(selected); }}
+      />
     </>
   );
 }

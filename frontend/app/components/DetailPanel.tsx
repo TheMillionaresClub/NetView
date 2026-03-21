@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 /* ════════════════════════════════════════════════════════
-   TYPES — miroir exact du data.json
+   TYPES
 ════════════════════════════════════════════════════════ */
 export interface TopToken {
   symbol: string;
@@ -31,6 +31,8 @@ export interface WalletData {
 interface Props {
   wallet: WalletData | null;
   onClose: () => void;
+  isUnlocked?: boolean;
+  onUnlock?: () => void;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -57,7 +59,6 @@ function fmtTx(n: number): string {
   return n.toString();
 }
 
-/* couleur + label par type de wallet */
 const TYPE_THEME: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
   primary:  { color: "#fb923c", bg: "rgba(249,115,22,.12)",  label: "PRIMARY",  emoji: "◉" },
   whale:    { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "WHALE",    emoji: "◎" },
@@ -66,48 +67,25 @@ const TYPE_THEME: Record<string, { color: string; bg: string; label: string; emo
   investor: { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "INVESTOR", emoji: "◈" },
 };
 
-/* couleur action */
 const ACTION_COLOR: Record<string, string> = {
-  SWAP:     "#ffd740",
-  BUY:      "#00e676",
-  RECEIVE:  "#00e676",
-  DEPOSIT:  "#00e676",
-  POOL_ADD: "#00e676",
-  STAKE:    "#00e5ff",
-  ROUTE:    "#00e5ff",
-  SEND:     "#ff1744",
-  WITHDRAW: "#ff1744",
-  APPROVE:  "#4a6080",
+  SWAP: "#ffd740", BUY: "#00e676", RECEIVE: "#00e676",
+  DEPOSIT: "#00e676", POOL_ADD: "#00e676", STAKE: "#00e5ff",
+  ROUTE: "#00e5ff", SEND: "#ff1744", WITHDRAW: "#ff1744", APPROVE: "#4a6080",
 };
-
 function actionColor(a: string): string {
   return ACTION_COLOR[a.toUpperCase()] ?? "#c8d8ec";
 }
-
-/* icône direction par action */
 function actionArrow(a: string): string {
-  const out = ["SEND", "WITHDRAW", "POOL_ADD"];
-  const neu = ["APPROVE", "STAKE", "ROUTE"];
-  if (out.includes(a.toUpperCase())) return "↗";
-  if (neu.includes(a.toUpperCase())) return "↔";
+  if (["SEND","WITHDRAW","POOL_ADD"].includes(a.toUpperCase())) return "↗";
+  if (["APPROVE","STAKE","ROUTE"].includes(a.toUpperCase())) return "↔";
   return "↙";
 }
-
-/* couleur fond flèche */
 function arrowBg(a: string): string {
-  const out = ["SEND", "WITHDRAW", "POOL_ADD"];
-  const neu = ["APPROVE", "STAKE", "ROUTE"];
-  if (out.includes(a.toUpperCase())) return "rgba(255,23,68,.12)";
-  if (neu.includes(a.toUpperCase())) return "rgba(0,229,255,.1)";
+  if (["SEND","WITHDRAW","POOL_ADD"].includes(a.toUpperCase())) return "rgba(255,23,68,.12)";
+  if (["APPROVE","STAKE","ROUTE"].includes(a.toUpperCase())) return "rgba(0,229,255,.1)";
   return "rgba(0,230,118,.12)";
 }
 
-/* max balance pour la barre de token */
-function maxBalance(tokens: TopToken[]): number {
-  return Math.max(...tokens.map((t) => t.balance), 1);
-}
-
-/* couleur token */
 const TOKEN_COLORS: Record<string, string> = {
   ETH: "#627EEA", WBTC: "#F7931A", BTC: "#F7931A",
   USDT: "#26A17B", USDC: "#2775CA", DAI: "#F5AC37",
@@ -125,13 +103,16 @@ function tokenIcon(sym: string): string {
   return TOKEN_ICONS[sym.toUpperCase()] ?? sym[0];
 }
 
+function maxBalance(tokens: TopToken[]): number {
+  return Math.max(...tokens.map((t) => t.balance), 1);
+}
+
 /* ════════════════════════════════════════════════════════
    COMPOSANT
 ════════════════════════════════════════════════════════ */
-export default function DetailPanel({ wallet, onClose }: Props) {
+export default function DetailPanel({ wallet, onClose, isUnlocked = false, onUnlock }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
 
-  /* clic extérieur → fermer */
   useEffect(() => {
     if (!wallet) return;
     const h = (e: MouseEvent) => {
@@ -141,7 +122,6 @@ export default function DetailPanel({ wallet, onClose }: Props) {
     return () => { clearTimeout(t); document.removeEventListener("mousedown", h); };
   }, [wallet, onClose]);
 
-  /* Escape → fermer */
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", h);
@@ -152,140 +132,153 @@ export default function DetailPanel({ wallet, onClose }: Props) {
 
   const theme  = TYPE_THEME[wallet.type] ?? TYPE_THEME.investor;
   const maxBal = maxBalance(wallet.topTokens);
+  const isMe   = wallet.id === "me";
+  const locked = !isMe && !isUnlocked;
 
   return (
     <>
-      {/* ── backdrop ── */}
       <div className="dp-backdrop" onClick={onClose} />
 
-      {/* ── carte ── */}
       <div ref={cardRef} className="dp-card">
 
-        {/* barre couleur */}
-        <div style={{ height: 3, background: theme.color, flexShrink: 0 }} />
+        {/* accent bar */}
+        <div style={{ height: 3, background: locked ? "#1c2d42" : theme.color, flexShrink: 0 }} />
 
-        {/* ═══ HEADER ═══ */}
+        {/* HEADER — always visible */}
         <div className="dp-header">
-          <div className="dp-avatar" style={{ background: theme.bg, border: `1.5px solid ${theme.color}` }}>
-            <span style={{ color: theme.color, fontSize: 22 }}>{theme.emoji}</span>
+          <div className="dp-avatar" style={{
+            background: locked ? "rgba(28,45,66,.4)" : theme.bg,
+            border: `1.5px solid ${locked ? "#1c2d42" : theme.color}`,
+          }}>
+            <span style={{ color: locked ? "#4a6080" : theme.color, fontSize: 22 }}>
+              {locked ? "🔒" : theme.emoji}
+            </span>
           </div>
           <div className="dp-header-info">
             <div className="dp-wallet-name">{wallet.name}</div>
             <div className="dp-wallet-id">{wallet.id}</div>
-            <span className="dp-badge" style={{ color: theme.color, borderColor: theme.color, background: theme.bg }}>
-              {theme.label}
-            </span>
+            {!locked && (
+              <span className="dp-badge" style={{ color: theme.color, borderColor: theme.color, background: theme.bg }}>
+                {theme.label}
+              </span>
+            )}
           </div>
           <button className="dp-close" onClick={onClose}>✕</button>
         </div>
 
-        {/* ═══ BODY ═══ */}
-        <div className="dp-body">
+        {/* LOCKED BODY */}
+        {locked ? (
+          <div className="dp-locked-body">
+            <div className="dp-lock-icon">🔒</div>
+            <div className="dp-lock-title">PAY TO VIEW</div>
+            <div className="dp-lock-sub">Unlock this wallet&apos;s links and on-chain activity</div>
+            <button className="dp-unlock-btn" onClick={onUnlock}>
+              Unlock · 0.01 TON ↗
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* UNLOCKED BODY */}
+            <div className="dp-body">
 
-          {/* ── COL GAUCHE ── */}
-          <div className="dp-col">
+              {/* left col */}
+              <div className="dp-col">
+                <div className="dp-block">
+                  <div className="dp-block-label">TOTAL VOLUME</div>
+                  <div className="dp-big-number" style={{ color: theme.color }}>
+                    {fmtUSD(wallet.totalVolume)}
+                  </div>
+                </div>
 
-            {/* TOTAL VOLUME */}
-            <div className="dp-block">
-              <div className="dp-block-label">TOTAL VOLUME</div>
-              <div className="dp-big-number" style={{ color: theme.color }}>
-                {fmtUSD(wallet.totalVolume)}
-              </div>
-            </div>
+                <div className="dp-block">
+                  <div className="dp-block-label">NB TRANSACTIONS</div>
+                  <div className="dp-big-number">{fmtTx(wallet.totalTransactions)}</div>
+                  <div className="dp-sub-text">transactions confirmées</div>
+                </div>
 
-            {/* NB TRANSACTIONS */}
-            <div className="dp-block">
-              <div className="dp-block-label">NB TRANSACTIONS</div>
-              <div className="dp-big-number">{fmtTx(wallet.totalTransactions)}</div>
-              <div className="dp-sub-text">transactions confirmées</div>
-            </div>
-
-            {/* TOP TOKENS */}
-            <div className="dp-block" style={{ borderBottom: "none" }}>
-              <div className="dp-block-label">TOP {wallet.topTokens.length} TOKENS</div>
-              <div className="dp-token-list">
-                {wallet.topTokens.map((t, i) => {
-                  const col = tokenColor(t.symbol);
-                  const pct = Math.round((t.balance / maxBal) * 100);
-                  return (
-                    <div key={t.symbol} className="dp-token-row">
-                      <div className="dp-token-rank" style={{ color: i === 0 ? "#ffd740" : "#4a6080" }}>
-                        #{i + 1}
-                      </div>
-                      <div className="dp-token-icon" style={{ background: col + "22", color: col }}>
-                        {tokenIcon(t.symbol)}
-                      </div>
-                      <div className="dp-token-info">
-                        <div className="dp-token-sym">{t.symbol}</div>
-                        <div className="dp-token-bar-wrap">
-                          <div className="dp-token-bar-bg">
-                            <div className="dp-token-bar-fill" style={{ width: pct + "%", background: col }} />
+                <div className="dp-block" style={{ borderBottom: "none" }}>
+                  <div className="dp-block-label">TOP {wallet.topTokens.length} TOKENS</div>
+                  <div className="dp-token-list">
+                    {wallet.topTokens.map((t, i) => {
+                      const col = tokenColor(t.symbol);
+                      const pct = Math.round((t.balance / maxBal) * 100);
+                      return (
+                        <div key={t.symbol} className="dp-token-row">
+                          <div className="dp-token-rank" style={{ color: i === 0 ? "#ffd740" : "#4a6080" }}>
+                            #{i + 1}
                           </div>
-                          <span className="dp-token-pct">{pct}%</span>
+                          <div className="dp-token-icon" style={{ background: col + "22", color: col }}>
+                            {tokenIcon(t.symbol)}
+                          </div>
+                          <div className="dp-token-info">
+                            <div className="dp-token-sym">{t.symbol}</div>
+                            <div className="dp-token-bar-wrap">
+                              <div className="dp-token-bar-bg">
+                                <div className="dp-token-bar-fill" style={{ width: pct + "%", background: col }} />
+                              </div>
+                              <span className="dp-token-pct">{pct}%</span>
+                            </div>
+                          </div>
+                          <div className="dp-token-balance">{fmtBalance(t.balance)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="dp-col-sep" />
+
+              {/* right col */}
+              <div className="dp-col dp-col-right">
+                <div className="dp-block-label" style={{ padding: "14px 16px 8px" }}>
+                  RECENT TRANSACTIONS
+                </div>
+                <div className="dp-tx-list">
+                  {wallet.recentTransactions.map((tx, i) => {
+                    const col   = actionColor(tx.action);
+                    const arrow = actionArrow(tx.action);
+                    const bg    = arrowBg(tx.action);
+                    return (
+                      <div key={i} className="dp-tx-row">
+                        <div className="dp-tx-arrow" style={{ background: bg, color: col }}>{arrow}</div>
+                        <div className="dp-tx-detail">
+                          <div className="dp-tx-action" style={{ color: col }}>{tx.action}</div>
+                          <div className="dp-tx-token">{tx.token}</div>
+                        </div>
+                        <div className="dp-tx-right">
+                          <div className="dp-tx-amount">
+                            {tx.amount > 0 ? fmtBalance(tx.amount) : "—"} {tx.token}
+                          </div>
+                          <div className="dp-tx-usd">{tx.amount > 0 ? fmtUSD(tx.amount) : ""}</div>
+                          <div className="dp-tx-time">{tx.time}</div>
                         </div>
                       </div>
-                      <div className="dp-token-balance">{fmtBalance(t.balance)}</div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="dp-col-sep" />
-
-          {/* ── COL DROITE : RECENT TRANSACTIONS ── */}
-          <div className="dp-col dp-col-right">
-            <div className="dp-block-label" style={{ padding: "14px 16px 8px" }}>
-              RECENT TRANSACTIONS
+            {/* FOOTER */}
+            <div className="dp-footer">
+              <span className="dp-footer-meta">
+                {wallet.totalTransactions} txns · {wallet.topTokens.length} tokens
+              </span>
+              <button
+                className="dp-explorer-btn"
+                onClick={() => {
+                  const tg = (window as any).Telegram?.WebApp;
+                  const url = `https://tonscan.org/address/${wallet.id}`;
+                  if (tg) tg.openLink?.(url);
+                  else window.open(url, "_blank");
+                }}
+              >
+                VIEW ON EXPLORER ↗
+              </button>
             </div>
-            <div className="dp-tx-list">
-              {wallet.recentTransactions.map((tx, i) => {
-                const col   = actionColor(tx.action);
-                const arrow = actionArrow(tx.action);
-                const bg    = arrowBg(tx.action);
-                return (
-                  <div key={i} className="dp-tx-row">
-                    <div className="dp-tx-arrow" style={{ background: bg, color: col }}>
-                      {arrow}
-                    </div>
-                    <div className="dp-tx-detail">
-                      <div className="dp-tx-action" style={{ color: col }}>{tx.action}</div>
-                      <div className="dp-tx-token">{tx.token}</div>
-                    </div>
-                    <div className="dp-tx-right">
-                      <div className="dp-tx-amount">
-                        {tx.amount > 0 ? fmtBalance(tx.amount) : "—"} {tx.token}
-                      </div>
-                      <div className="dp-tx-usd">
-                        {tx.amount > 0 ? fmtUSD(tx.amount) : ""}
-                      </div>
-                      <div className="dp-tx-time">{tx.time}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* ═══ FOOTER ═══ */}
-        <div className="dp-footer">
-          <span className="dp-footer-meta">
-            {wallet.totalTransactions} txns · {wallet.topTokens.length} tokens
-          </span>
-          <button
-            className="dp-explorer-btn"
-            onClick={() => {
-              const tg = (window as any).Telegram?.WebApp;
-              const url = `https://etherscan.io/search?q=${wallet.id}`;
-              if (tg) tg.openLink?.(url);
-              else window.open(url, "_blank");
-            }}
-          >
-            VIEW ON EXPLORER ↗
-          </button>
-        </div>
+          </>
+        )}
       </div>
 
       <style>{CSS}</style>
@@ -326,7 +319,6 @@ const CSS = `
   animation: dp-in .2s cubic-bezier(.4,0,.2,1) both;
 }
 
-/* header */
 .dp-header {
   display: flex; align-items: flex-start; gap: 12px;
   padding: 14px 16px 12px;
@@ -351,6 +343,37 @@ const CSS = `
 }
 .dp-close:hover { color: #fff; }
 
+/* locked state */
+.dp-locked-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 24px;
+}
+.dp-lock-icon  { font-size: 36px; opacity: .4; }
+.dp-lock-title {
+  font-size: 16px; font-weight: 700; letter-spacing: 3px;
+  color: #4a6080; text-transform: uppercase;
+}
+.dp-lock-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; color: #253548; text-align: center;
+}
+.dp-unlock-btn {
+  margin-top: 8px;
+  background: #00e5ff; color: #0b0e11;
+  border: none; cursor: pointer;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  padding: 9px 22px; border-radius: 4px;
+  transition: filter .15s, transform .1s;
+}
+.dp-unlock-btn:hover  { filter: brightness(1.1); }
+.dp-unlock-btn:active { transform: scale(.97); }
+
 /* body — 2 colonnes */
 .dp-body {
   display: flex;
@@ -369,7 +392,6 @@ const CSS = `
 .dp-col-right { flex: 1.1; }
 .dp-col-sep { width: 1px; background: #1c2d42; flex-shrink: 0; }
 
-/* blocks col gauche */
 .dp-block {
   padding: 14px 16px;
   border-bottom: 1px solid #1c2d42;
@@ -385,7 +407,6 @@ const CSS = `
 }
 .dp-sub-text { font-size: 10px; color: #4a6080; margin-top: 4px; }
 
-/* tokens */
 .dp-token-list { display: flex; flex-direction: column; gap: 10px; }
 .dp-token-row  { display: flex; align-items: center; gap: 8px; }
 .dp-token-rank {
@@ -408,7 +429,6 @@ const CSS = `
   font-size: 10px; color: #7a9ab8; text-align: right; flex-shrink: 0;
 }
 
-/* transactions col droite */
 .dp-tx-list { display: flex; flex-direction: column; padding: 0 0 8px; }
 .dp-tx-row  {
   display: flex; align-items: flex-start; gap: 10px;
@@ -423,9 +443,7 @@ const CSS = `
   font-size: 11px; margin-top: 1px;
 }
 .dp-tx-detail { flex: 1; min-width: 0; }
-.dp-tx-action {
-  font-size: 11px; font-weight: 700; letter-spacing: .5px;
-}
+.dp-tx-action { font-size: 11px; font-weight: 700; letter-spacing: .5px; }
 .dp-tx-token  {
   font-family: 'Share Tech Mono', monospace;
   font-size: 9px; color: #4a6080; margin-top: 1px;
@@ -441,7 +459,6 @@ const CSS = `
 }
 .dp-tx-time { font-size: 9px; color: #4a6080; margin-top: 2px; }
 
-/* footer */
 .dp-footer {
   display: flex; justify-content: space-between; align-items: center;
   padding: 10px 16px;
