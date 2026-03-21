@@ -127,7 +127,8 @@ function fmtNano(v: string): string {
   return n.toFixed(3);
 }
 
-function shortAddr(addr: string): string {
+function shortAddr(addr: string | undefined | null): string {
+  if (!addr) return "—";
   if (addr.length <= 12) return addr;
   return addr.slice(0, 6) + "…" + addr.slice(-4);
 }
