@@ -23,10 +23,17 @@ async function main() {
   const address = "0QD6a-uyjiAX8gRmtPi2ztdeBEliw6GrBa6dQBeM8wlQfJ5K";
   const info = await bg.get_address_information(address);
 
-  // info is a JSON string
-  const parsed = JSON.parse(info);
-  console.log("Balance:", parsed.balance, "Status:", parsed.status);
-  console.log("Full response:", JSON.stringify(parsed, null, 2));
+  // The function returns a string — could be JSON or raw value
+  console.log("Raw result:", info);
+
+  try {
+    const parsed = JSON.parse(info);
+    console.log("Parsed:", JSON.stringify(parsed, null, 2));
+  } catch {
+    // Raw value (e.g. balance in nanotons)
+    const tons = Number(info) / 1e9;
+    console.log("Balance:", tons.toFixed(4), "TON");
+  }
 }
 
 main().catch(console.error);
