@@ -10,114 +10,149 @@ import {
   Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import DetailPanel, { WalletData } from "./DetailPanel";
 
-// --- 1. LES MATHS POUR LA TAILLE ---
-const calculateRadius = (volume: number) => {
-  const MIN_RADIUS = 30;  // Taille minimale pour les petits portefeuilles
-  const MAX_RADIUS = 120; // Le fameux CAP maximal pour ne pas casser l'écran
+/* ════════════════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════════════════ */
+const calcRadius = (volume: number) =>
+  Math.min(110, Math.max(38, Math.sqrt(volume) * 0.15));
 
-  // On utilise la racine carrée pour que l'aire soit proportionnelle au volume
-  // Le multiplicateur (0.15) est à ajuster selon si tes volumes sont énormes ou petits
-  const rawRadius = Math.sqrt(volume) * 0.15; 
+const THEMES: Record<string, { ring: string; glow: string; bg: string }> = {
+  primary:  { ring: "border-orange-400", glow: "shadow-[0_0_22px_rgba(249,115,22,.45)]",  bg: "bg-orange-900/60"  },
+  whale:    { ring: "border-purple-400", glow: "shadow-[0_0_22px_rgba(168,85,247,.45)]",  bg: "bg-purple-900/60"  },
+  trader:   { ring: "border-blue-400",   glow: "shadow-[0_0_22px_rgba(59,130,246,.45)]",  bg: "bg-blue-900/60"    },
+  degen:    { ring: "border-green-400",  glow: "shadow-[0_0_22px_rgba(34,197,94,.45)]",   bg: "bg-green-900/60"   },
+  investor: { ring: "border-cyan-400",   glow: "shadow-[0_0_22px_rgba(6,182,212,.45)]",   bg: "bg-cyan-900/60"    },
+};
+const theme = (t: string) => THEMES[t] ?? { ring: "border-slate-400", glow: "shadow-sm", bg: "bg-slate-800/60" };
+const EMOJI: Record<string, string> = { primary:"◉", whale:"◎", trader:"⟳", degen:"⚡", investor:"◈" };
 
-  // On s'assure que le rayon reste entre MIN_RADIUS et MAX_RADIUS
-  return Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, rawRadius));
+function fmtVol(v: number) {
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return "$" + (v / 1e3).toFixed(1) + "K";
+  return "$" + v;
+}
+
+/* ════════════════════════════════════════════════════════
+   CUSTOM NODE
+════════════════════════════════════════════════════════ */
+type NodeData = {
+  name: string;
+  volume: number;
+  radius: number;
+  raw: WalletData;
+  selected: boolean;
+  onSelect: (w: WalletData) => void;
 };
 
-// --- 2. LE DESIGN DE LA PERSONNE (Custom Node) ---
-const PersonNode = ({ data }: { data: any }) => {
-  const radius = data.radius;
-
-  // On passe sur des couleurs Tailwind pures avec des fonds sombres (900/40) 
-  // et des bordures vives (400) pour un contraste parfait.
-  const getTheme = (type: string) => {
-    switch(type) {
-      case 'whale': 
-        return 'bg-purple-900/60 border-purple-400 text-purple-50 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:bg-purple-800/80';
-      case 'trader': 
-        return 'bg-blue-900/60 border-blue-400 text-blue-50 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:bg-blue-800/80';
-      case 'degen': 
-        return 'bg-green-900/60 border-green-400 text-green-50 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:bg-green-800/80';
-      case 'primary': 
-        return 'bg-orange-900/60 border-orange-400 text-orange-50 shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:bg-orange-800/80';
-      default: 
-        return 'bg-slate-800/60 border-slate-400 text-slate-50 shadow-sm hover:bg-slate-700/80';
-    }
-  };
+const PersonNode = ({ data }: { data: NodeData }) => {
+  const { radius, raw, selected, onSelect } = data;
+  const t = theme(raw.type);
 
   return (
     <div
-      className={`relative flex flex-col items-center justify-center rounded-full border-2 backdrop-blur-sm transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden ${getTheme(data.raw.type)}`}
-      style={{
-        width: radius * 2,
-        height: radius * 2,
-      }}
+      onClick={() => onSelect(raw)}
+      className={`
+        relative flex flex-col items-center justify-center
+        rounded-full border-2 backdrop-blur-sm cursor-pointer
+        transition-all duration-200 select-none
+        text-white overflow-hidden
+        ${t.bg} ${t.ring} ${t.glow}
+        ${selected
+          ? "scale-110 border-4 brightness-125"
+          : "hover:scale-105 hover:brightness-110"}
+      `}
+      style={{ width: radius * 2, height: radius * 2 }}
     >
-      {/* On limite la taille du texte et on force la coupure avec 'truncate' si le nom est trop long */}
-      <span className="font-bold text-xs sm:text-sm text-center px-3 w-full truncate drop-shadow-md">
+      <span className="text-[10px] opacity-50 leading-none mb-0.5">
+        {EMOJI[raw.type] ?? "◎"}
+      </span>
+      <span className="font-bold text-xs text-center px-2 w-full truncate leading-tight">
         {data.name}
       </span>
-      
-      {/* Le montant en plus petit, bien centré */}
-      <span className="text-[10px] sm:text-xs opacity-90 font-mono mt-1 font-semibold tracking-wider">
-        ${data.volume >= 1000 ? (data.volume / 1000).toFixed(1) + "k" : data.volume}
+      <span className="text-[10px] opacity-75 font-mono mt-0.5 tracking-wide">
+        {fmtVol(data.volume)}
       </span>
 
-      {/* Handles cachés pour React Flow */}
-      <Handle type="target" position={Position.Top} className="opacity-0" />
-      <Handle type="source" position={Position.Bottom} className="opacity-0" />
+      {selected && (
+        <span className="absolute inset-0 rounded-full border-2 border-white/20 animate-ping pointer-events-none" />
+      )}
+
+      <Handle type="target" position={Position.Top}    style={{ opacity: 0, width: 0, height: 0 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, width: 0, height: 0 }} />
     </div>
   );
 };
 
-// --- 3. LE COMPOSANT PRINCIPAL ---
+/* ════════════════════════════════════════════════════════
+   BUBBLE MAP
+════════════════════════════════════════════════════════ */
 export default function BubbleMap() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [selected, setSelected]          = useState<WalletData | null>(null);
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
 
+  /* ── charger data.json ── */
   useEffect(() => {
     fetch("/data.json")
-      .then((res) => res.json())
-      .then((data) => {
-        // On transforme le JSON en "Nodes" compréhensibles par React Flow
-        const newNodes = data.map((person: any, index: number) => {
-          const r = calculateRadius(person.totalVolume);
-          
-          // Génération de positions pour éparpiller les bulles sur l'écran
-          // On fait une petite grille mathématique dynamique
-          const x = (index % 3) * 300 + Math.random() * 50;
-          const y = Math.floor(index / 3) * 250 + Math.random() * 50;
-
+      .then((r) => r.json())
+      .then((data: WalletData[]) => {
+        const newNodes = data.map((p, i) => {
+          const r   = calcRadius(p.totalVolume);
+          const col = i % 3;
+          const row = Math.floor(i / 3);
           return {
-            id: person.id,
+            id:   p.id,
             type: "person",
-            position: { x, y },
+            position: {
+              x: col * 290 + (Math.random() - 0.5) * 60 + 60,
+              y: row * 270 + (Math.random() - 0.5) * 60 + 60,
+            },
             data: {
-              name: person.name,
-              volume: person.totalVolume,
-              radius: r,
-              raw: person, // On garde toutes les infos (tokens, transactions) pour le futur panneau de détails !
+              name:     p.name,
+              volume:   p.totalVolume,
+              radius:   r,
+              raw:      p,
+              selected: false,
+              onSelect: setSelected,
             },
           };
         });
-
         setNodes(newNodes);
       });
   }, [setNodes]);
 
+  /* ── sync état sélection sur les nœuds ── */
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        data: { ...n.data, selected: selected?.id === n.id, onSelect: setSelected },
+      }))
+    );
+  }, [selected, setNodes]);
+
   return (
-    <main className="fixed left-20 right-80 top-14 bottom-0 bg-surface-container-lowest grid-bg overflow-hidden">
-      <ReactFlow
-        nodes={nodes}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        fitView
-        minZoom={0.2}
-        maxZoom={2}
-      >
-        <Background color="#374151" gap={20} size={1} />
-        <Controls className="fill-white" />
-      </ReactFlow>
-    </main>
+    <>
+      <main className="fixed left-20 right-0 top-14 bottom-0 overflow-hidden"
+            style={{ background: "#080d14" }}>
+        <ReactFlow
+          nodes={nodes}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onPaneClick={() => setSelected(null)}
+          fitView
+          minZoom={0.2}
+          maxZoom={2.5}
+        >
+          <Background color="#1a2535" gap={26} size={1} />
+          <Controls />
+        </ReactFlow>
+      </main>
+
+      {/* carte détail flottante */}
+      <DetailPanel wallet={selected} onClose={() => setSelected(null)} />
+    </>
   );
 }
