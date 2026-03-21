@@ -1,6 +1,8 @@
 use reqwest_wasm::{Client, Error};
 use serde::{Deserialize, Serialize};
 
+use crate::network::Network;
+
 #[derive(Deserialize, Serialize)]
 pub struct RequestError {
     code: u16,
@@ -30,8 +32,9 @@ impl From<Error> for RequestError {
         Self::new(value.to_string(), value.status().map(|s| s.as_u16()).unwrap_or(500))
     }
 }
-pub async fn fetch_address_balance(client: &Client, address: &str) -> Result<String, RequestError> {
-    let resp = client.get("https://testnet.toncenter.com/api/v3/addressInformation")
+
+pub async fn fetch_address_balance(client: &Client, address: &str, network: &Network) -> Result<String, RequestError> {
+    let resp = client.get(network.balance_url())
         .query(&[("address", address)])
         .send()
         .await?
