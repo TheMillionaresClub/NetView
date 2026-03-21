@@ -837,21 +837,18 @@ export default function BubbleMap({
           <Controls />
 
           {/* Realign button */}
-          {nodes.length > 1 && (
-            <Panel position="bottom-left" style={{ marginBottom: 8, marginLeft: 8 }}>
-              <button
-                onClick={handleRealign}
-                title="Auto-layout: spread overlapping nodes"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold font-mono uppercase tracking-widest
-                           bg-[#0b1421]/90 border border-[#1c2d42] text-[#4a6080] rounded
-                           hover:border-[#00e5ff] hover:text-[#00e5ff] transition-all cursor-pointer
-                           backdrop-blur-sm shadow-lg"
-              >
-                <span className="material-symbols-outlined text-sm">auto_fix_high</span>
-                Realign
-              </button>
-            </Panel>
-          )}
+          <Panel position="top-left" style={{ marginTop: 8, marginLeft: 8 }}>
+            <button
+              onClick={handleRealign}
+              title="Auto-layout: spread overlapping nodes"
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
+                         bg-blue-600/90 border border-blue-400/50 text-white rounded-lg
+                         hover:bg-blue-500 hover:border-blue-300 transition-all cursor-pointer
+                         backdrop-blur-sm shadow-lg"
+            >
+              &#x2728; Realign
+            </button>
+          </Panel>
         </ReactFlow>
       </main>
 
