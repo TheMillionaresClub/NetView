@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import TopNavBar from "../components/TopNavBar";
-import SideNavBar from "../components/SideNavBar";
+import TopNavBar from "../../components/TopNavBar";
+import SideNavBar from "../../components/SideNavBar";
 
 // ── Types matching the API response ──────────────────────────────
 interface Match {
