@@ -154,6 +154,8 @@ export default function BubbleMap({
 
   /* ── 1. CHARGEMENT INITIAL (La Galaxy de 30 users) ── */
   useEffect(() => {
+    const savedState = loadSaved();
+
     fetch("/data.json")
       .then((r) => r.json())
       .then((data: WalletData[]) => {
@@ -162,7 +164,7 @@ export default function BubbleMap({
         const mainNode = {
           id: "me",
           type: "person",
-          position: { x: 0, y: 0 },
+          position: savedState?.nodePositions?.["me"] ?? { x: 0, y: 0 },
           data: {
             name: userAddress ? "Mon Wallet" : "Non Connecté",
             volume: 0, 
@@ -173,21 +175,22 @@ export default function BubbleMap({
           },
         };
 
-        // On agrandit l'orbite pour faire rentrer 30 personnes (de 350 à 450)
-        // Et on ajoute un petit décalage aléatoire pour que ça fasse moins "cercle parfait" et plus "galaxie"
         const radiusOrbit = 450;
         const newNodes = data.map((p, i) => {
           const r = calcRadius(p.totalVolume);
           const angle = (i / data.length) * 2 * Math.PI; 
-          const jitter = (Math.random() - 0.5) * 150; // Décalage naturel
+          const jitter = (Math.random() - 0.5) * 150;
+          
+          // Use saved position if available, otherwise compute fresh
+          const defaultPos = {
+            x: Math.cos(angle) * (radiusOrbit + jitter),
+            y: Math.sin(angle) * (radiusOrbit + jitter),
+          };
           
           return {
             id: p.id,
             type: "person",
-            position: {
-              x: Math.cos(angle) * (radiusOrbit + jitter),
-              y: Math.sin(angle) * (radiusOrbit + jitter),
-            },
+            position: savedState?.nodePositions?.[p.id] ?? defaultPos,
             data: {
               name: p.name,
               volume: p.totalVolume,
@@ -200,8 +203,13 @@ export default function BubbleMap({
         });
 
         setNodes([mainNode, ...newNodes]);
+
+        // Restore saved edges for previously unlocked wallets
+        if (savedState?.edges && savedState.edges.length > 0) {
+          setEdges(savedState.edges);
+        }
       });
-  }, [setNodes, userAddress]);
+  }, [setNodes, setEdges, userAddress]);
 
   /* ── 2. LOGIQUE DU PAIEMENT ── */
   const triggerBackendRequest = async (walletData: WalletData) => {
@@ -335,6 +343,13 @@ export default function BubbleMap({
       }))
     );
   }, [selected, setNodes]);
+
+  /* ── PERSIST STATE TO LOCAL STORAGE ── */
+  useEffect(() => {
+    if (nodes.length > 0) {
+      saveToStorage(nodes, edges, unlockedWallets);
+    }
+  }, [nodes, edges, unlockedWallets]);
 
   return (
     <>
