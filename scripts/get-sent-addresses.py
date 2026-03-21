@@ -71,7 +71,12 @@ def fetch_all_transactions(base_url: str, address: str, api_key: str, max_txs: i
             params["hash"] = last_hash
 
         print(f"  ⟳ Fetching page {page} (lt={last_lt or 'latest'})...")
-        data = api_get(base_url, "getTransactions", params, api_key)
+
+        try:
+            data = api_get(base_url, "getTransactions", params, api_key)
+        except (HTTPError, URLError):
+            print(f"  ⚠ Pagination stopped (API error). Returning {len(all_txs)} txs collected so far.")
+            break
 
         if not data.get("ok"):
             print(f"  ✗ API error: {data.get('error', 'unknown')}")
@@ -98,11 +103,8 @@ def fetch_all_transactions(base_url: str, address: str, api_key: str, max_txs: i
         # Prepare next page cursor
         last_tx = txs[-1]
         last_lt = last_tx["transaction_id"]["lt"]
-        # toncenter expects the hash as hex or properly encoded base64
-        raw_hash = last_tx["transaction_id"]["hash"]
-        try:
-            # Convert base64 hash → hex (toncenter is more reliable with hex)
-            last_hash = base64.b64decode(raw_hash + "=" * (-len(raw_hash) % 4)).hex()
+        # Pass hash as-is (base64) — urlencode handles special chars
+        last_hash = last_tx["transaction_id"]["hash"]
         except Exception:
             last_hash = raw_hash
 
