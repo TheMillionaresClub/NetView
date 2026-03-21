@@ -10,15 +10,16 @@
   },
   "dependencies": {
     "@ton-x402/core": "workspace:*",
-    "@ton-x402/middleware": "workspace:*",
     "@ton-x402/facilitator": "workspace:*",
-    "express": "^4.21.0",
+    "@ton-x402/middleware": "workspace:*",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.0"
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "wallet-info": "workspace:*"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
