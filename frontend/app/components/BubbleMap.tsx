@@ -270,7 +270,7 @@ export default function BubbleMap({
         const transaction = {
           validUntil: Math.floor(Date.now() / 1000) + 60,
           messages: [{
-            address: invoice.address || "EQD__________________________________________0vo",
+            address: invoice.address || "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_",
             amount: invoice.amount || "10000000",
             payload: invoice.payload
           }],
@@ -284,7 +284,7 @@ export default function BubbleMap({
     } catch (error) {
       const mockTransaction = {
         validUntil: Math.floor(Date.now() / 1000) + 60,
-        messages: [{ address: "EQD__________________________________________0vo", amount: "10000000" }],
+        messages: [{ address: "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_", amount: "10000000" }],
       };
       
       try {
