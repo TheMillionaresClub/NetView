@@ -618,6 +618,10 @@ const CSS = `
   from { opacity:0; transform:translateX(-50%) translateY(20px) scale(.97); }
   to   { opacity:1; transform:translateX(-50%) translateY(0)    scale(1);   }
 }
+@keyframes dp-in-mobile {
+  from { opacity:0; transform:translateY(40px); }
+  to   { opacity:1; transform:translateY(0); }
+}
 @keyframes dp-spin {
   to { transform: rotate(360deg); }
 }
@@ -647,11 +651,15 @@ const CSS = `
 }
 @media (max-width: 639px) {
   .dp-card {
-    bottom: 0; left: 0;
+    bottom: 0; left: 0; right: 0;
     transform: none;
     width: 100%;
-    max-height: 80vh;
+    max-height: 85vh;
     border-radius: 14px 14px 0 0;
+    animation: dp-in-mobile .25s cubic-bezier(.4,0,.2,1) both;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -696,11 +704,15 @@ const CSS = `
 .dp-col-right { flex: 1.1; }
 .dp-col-sep { width: 1px; background: #1c2d42; flex-shrink: 0; }
 @media (max-width: 639px) {
-  .dp-body { flex-direction: column; overflow-y: auto; }
-  .dp-col  { overflow-y: visible; flex: none; }
-  .dp-col-right { flex: none; }
-  .dp-col-sep { width: 100%; height: 1px; }
-  .dp-big-number { font-size: 22px; }
+  .dp-body        { flex-direction: column; overflow-y: auto; flex: 1; min-height: 0; }
+  .dp-col         { overflow-y: visible; flex: none; min-height: 0; }
+  .dp-col-right   { flex: none; }
+  .dp-col-sep     { width: 100%; height: 1px; }
+  .dp-big-number  { font-size: 22px; }
+  .dp-wallet-name { font-size: 14px; }
+  .dp-wallet-id   { font-size: 9px; }
+  .dp-flow-value  { font-size: 13px; }
+  .dp-nft-grid    { grid-template-columns: repeat(2, 1fr); }
 }
 
 .dp-block {
