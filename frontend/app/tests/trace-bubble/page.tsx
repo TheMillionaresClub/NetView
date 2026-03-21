@@ -123,13 +123,27 @@ function buildFlowGraph(result: TraceResult): { nodes: Node[]; edges: Edge[] } {
     }
   };
 
+  // First pass: count how many connections each address has across ALL graphs
+  // (counts inbound references, not just outbound from expanded nodes)
+  const connectionCount = new Map<string, number>();
+  const bumpCount = (addr: string) => connectionCount.set(addr, (connectionCount.get(addr) ?? 0) + 1);
+
+  for (const node of Object.values(result.masterGraph)) {
+    bumpCount(node.address);
+    for (const n of node.interactsWith) bumpCount(n);
+  }
+  for (const node of Object.values(result.targetGraph)) {
+    bumpCount(node.address);
+    for (const n of node.interactsWith) bumpCount(n);
+  }
+
   // Master wallet
   const masterNode = result.masterGraph[result.master];
-  addAddr(result.master, "master", masterNode?.interactsWith.length ?? 0);
+  addAddr(result.master, "master", masterNode?.interactsWith.length ?? connectionCount.get(result.master) ?? 0);
 
   // Target wallet
   const targetNode = result.targetGraph[result.target];
-  addAddr(result.target, "target", targetNode?.interactsWith.length ?? 0);
+  addAddr(result.target, "target", targetNode?.interactsWith.length ?? connectionCount.get(result.target) ?? 0);
 
   // Master graph neighbours
   for (const [addr, node] of Object.entries(result.masterGraph)) {
@@ -138,7 +152,7 @@ function buildFlowGraph(result: TraceResult): { nodes: Node[]; edges: Edge[] } {
     }
     for (const n of node.interactsWith) {
       const role = matchSet.has(n) ? "match" : "master1";
-      addAddr(n, role, 0); // interactions unknown for leaf nodes
+      addAddr(n, role, connectionCount.get(n) ?? 0);
     }
   }
 
@@ -149,7 +163,7 @@ function buildFlowGraph(result: TraceResult): { nodes: Node[]; edges: Edge[] } {
     }
     for (const n of node.interactsWith) {
       const role = matchSet.has(n) ? "match" : "target1";
-      addAddr(n, role, 0);
+      addAddr(n, role, connectionCount.get(n) ?? 0);
     }
   }
 
