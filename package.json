@@ -6,7 +6,8 @@
   "workspaces": [
     "packages/*",
     "examples/*",
-    "api"
+    "api",
+    "frontend"
   ],
   "scripts": {
     "dev": "pnpm dev:server",
@@ -14,6 +15,7 @@
     "start:server": "pnpm --filter x402-nextjs-example start",
     "dev:client": "pnpm --filter x402-client-example pay",
     "dev:api": "pnpm --filter x402-express-api dev",
+    "dev:frontend": "pnpm --filter frontend dev",
     "dev:client:joke": "pnpm --filter x402-client-example pay:joke",
     "address": "pnpm --filter x402-client-example address --",
     "build": "pnpm --filter './packages/**' -r build",
