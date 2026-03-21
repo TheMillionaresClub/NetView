@@ -277,21 +277,45 @@ function buildFlowGraph(result: TraceResult): { nodes: Node[]; edges: Edge[] } {
   return { nodes, edges };
 }
 
+// ── LocalStorage key ─────────────────────────────────────────────
+const LS_KEY = "trace-bubble-state";
+
+function loadSaved(): { master: string; target: string; maxDepth: number; txLimit: number; result: TraceResult | null } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveState(master: string, target: string, maxDepth: number, txLimit: number, result: TraceResult | null) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ master, target, maxDepth, txLimit, result }));
+  } catch { /* quota exceeded — ignore */ }
+}
+
 // ── Main Page ────────────────────────────────────────────────────
 export default function TraceBubblePage() {
-  const [master, setMaster] = useState("0QD-F8oMBbR7p3SCMbGFQZOuxyNmu_-Kf9ilGmeSSC9IyFwz");
-  const [target, setTarget] = useState("kQAKOQd9PsEbmu_CS4TWCko8cHfQbxHavCGwW6lx71IcgUt1");
-  const [maxDepth, setMaxDepth] = useState(3);
-  const [txLimit, setTxLimit] = useState(80);
+  const saved = useMemo(() => loadSaved(), []);
+
+  const [master, setMaster] = useState(saved?.master ?? "0QD-F8oMBbR7p3SCMbGFQZOuxyNmu_-Kf9ilGmeSSC9IyFwz");
+  const [target, setTarget] = useState(saved?.target ?? "kQAKOQd9PsEbmu_CS4TWCko8cHfQbxHavCGwW6lx71IcgUt1");
+  const [maxDepth, setMaxDepth] = useState(saved?.maxDepth ?? 3);
+  const [txLimit, setTxLimit] = useState(saved?.txLimit ?? 80);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<TraceResult | null>(null);
+  const [result, setResult] = useState<TraceResult | null>(saved?.result ?? null);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[]);
   const nodeTypes = useMemo(() => ({ bubble: BubbleNode }), []);
 
   const [selectedNode, setSelectedNode] = useState<BubbleData | null>(null);
+
+  // Persist to localStorage whenever result or inputs change
+  useEffect(() => {
+    saveState(master, target, maxDepth, txLimit, result);
+  }, [master, target, maxDepth, txLimit, result]);
 
   // Build flow graph when result changes
   useEffect(() => {

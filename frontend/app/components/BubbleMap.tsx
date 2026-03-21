@@ -101,6 +101,55 @@ const PersonNode = ({ data }: { data: NodeData }) => {
 };
 
 /* ════════════════════════════════════════════════════════
+   LOCAL STORAGE PERSISTENCE
+════════════════════════════════════════════════════════ */
+const LS_KEY = "bubblemap-state";
+
+type SavedState = {
+  nodePositions: Record<string, { x: number; y: number }>;
+  edges: any[];
+  unlockedWallets: string[];
+};
+
+/** Decompress a gzip-compressed base64url string back to JSON */
+async function decompressFromUrl(b64url: string): Promise<SavedState | null> {
+  try {
+    // base64url → standard base64
+    const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+    const padding = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+    const binary = atob(b64 + padding);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+
+    const ds = new DecompressionStream("gzip");
+    const writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const decompressed = await new Response(ds.readable).text();
+    return JSON.parse(decompressed);
+  } catch {
+    return null;
+  }
+}
+
+function loadSaved(): SavedState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveToStorage(nodes: any[], edges: any[], unlockedWallets: string[]) {
+  try {
+    const nodePositions: Record<string, { x: number; y: number }> = {};
+    for (const n of nodes) {
+      nodePositions[n.id] = n.position;
+    }
+    localStorage.setItem(LS_KEY, JSON.stringify({ nodePositions, edges, unlockedWallets }));
+  } catch { /* quota exceeded — ignore */ }
+}
+
+/* ════════════════════════════════════════════════════════
    BUBBLE MAP
 ════════════════════════════════════════════════════════ */
 export default function BubbleMap({ 
@@ -116,7 +165,9 @@ export default function BubbleMap({
   const [selected, setSelected]          = useState<WalletData | null>(null);
   
   const [allWalletsDb, setAllWalletsDb]  = useState<WalletData[]>([]);
-  const [unlockedWallets, setUnlockedWallets] = useState<string[]>([]);
+
+  const saved = useMemo(() => loadSaved(), []);
+  const [unlockedWallets, setUnlockedWallets] = useState<string[]>(saved?.unlockedWallets ?? []);
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const [tonConnectUI] = useTonConnectUI();
@@ -129,54 +180,85 @@ export default function BubbleMap({
 
   /* ── 1. CHARGEMENT INITIAL (La Galaxy de 30 users) ── */
   useEffect(() => {
-    fetch("/data.json")
-      .then((r) => r.json())
-      .then((data: WalletData[]) => {
-        setAllWalletsDb(data);
+    // Check for shared view in URL params first, then fall back to localStorage
+    const loadState = async (): Promise<SavedState | null> => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get("view");
+      if (viewParam) {
+        const shared = await decompressFromUrl(viewParam);
+        if (shared) {
+          // Save shared state to localStorage so it persists
+          saveToStorage([], shared.edges, shared.unlockedWallets);
+          // Clean the URL so the param doesn't stick around
+          window.history.replaceState({}, "", window.location.pathname);
+          return shared;
+        }
+      }
+      return loadSaved();
+    };
 
-        const mainNode = {
-          id: "me",
-          type: "person",
-          position: { x: 0, y: 0 },
-          data: {
-            name: userAddress ? "Mon Wallet" : "Non Connecté",
-            volume: 0, 
-            radius: 50,
-            raw: { id: "me", type: "primary", name: "Mon Wallet", totalVolume: 0, totalTransactions: 0, topTokens: [], recentTransactions: [] },
-            selected: false,
-            onSelect: setSelected,
-          },
-        };
+    loadState().then((savedState) => {
+      // Update unlocked wallets from loaded state
+      if (savedState?.unlockedWallets && savedState.unlockedWallets.length > 0) {
+        setUnlockedWallets(savedState.unlockedWallets);
+      }
 
-        // On agrandit l'orbite pour faire rentrer 30 personnes (de 350 à 450)
-        // Et on ajoute un petit décalage aléatoire pour que ça fasse moins "cercle parfait" et plus "galaxie"
-        const radiusOrbit = 450;
-        const newNodes = data.map((p, i) => {
-          const r = calcRadius(p.totalVolume);
-          const angle = (i / data.length) * 2 * Math.PI; 
-          const jitter = (Math.random() - 0.5) * 150; // Décalage naturel
-          
-          return {
-            id: p.id,
+      fetch("/data.json")
+        .then((r) => r.json())
+        .then((data: WalletData[]) => {
+          setAllWalletsDb(data);
+
+          const mainNode = {
+            id: "me",
             type: "person",
-            position: {
-              x: Math.cos(angle) * (radiusOrbit + jitter),
-              y: Math.sin(angle) * (radiusOrbit + jitter),
-            },
+            position: savedState?.nodePositions?.["me"] ?? { x: 0, y: 0 },
             data: {
-              name: p.name,
-              volume: p.totalVolume,
-              radius: r,
-              raw: p,
+              name: userAddress ? "Mon Wallet" : "Non Connecté",
+              volume: 0, 
+              radius: 50,
+              raw: { id: "me", type: "primary", name: "Mon Wallet", totalVolume: 0, totalTransactions: 0, topTokens: [], recentTransactions: [] },
               selected: false,
               onSelect: setSelected,
             },
           };
-        });
 
-        setNodes([mainNode, ...newNodes]);
-      });
-  }, [setNodes, userAddress]);
+          const radiusOrbit = 450;
+          const newNodes = data.map((p, i) => {
+            const r = calcRadius(p.totalVolume);
+            const angle = (i / data.length) * 2 * Math.PI; 
+            const jitter = (Math.random() - 0.5) * 150;
+            
+            // Use saved position if available, otherwise compute fresh
+            const defaultPos = {
+              x: Math.cos(angle) * (radiusOrbit + jitter),
+              y: Math.sin(angle) * (radiusOrbit + jitter),
+            };
+            
+            return {
+              id: p.id,
+              type: "person",
+              position: savedState?.nodePositions?.[p.id] ?? defaultPos,
+              data: {
+                name: p.name,
+                volume: p.totalVolume,
+                radius: r,
+                raw: p,
+                selected: false,
+                onSelect: setSelected,
+              },
+            };
+          });
+
+          setNodes([mainNode, ...newNodes]);
+
+          // Restore saved edges for previously unlocked wallets
+          if (savedState?.edges && savedState.edges.length > 0) {
+            setEdges(savedState.edges);
+          }
+        });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setNodes, setEdges, userAddress]);
 
   /* ── 2. LOGIQUE DU PAIEMENT ── */
   const triggerBackendRequest = async (walletData: WalletData) => {
@@ -310,6 +392,13 @@ export default function BubbleMap({
       }))
     );
   }, [selected, setNodes]);
+
+  /* ── PERSIST STATE TO LOCAL STORAGE ── */
+  useEffect(() => {
+    if (nodes.length > 0) {
+      saveToStorage(nodes, edges, unlockedWallets);
+    }
+  }, [nodes, edges, unlockedWallets]);
 
   return (
     <>
