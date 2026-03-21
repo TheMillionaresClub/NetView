@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toPng } from "html-to-image";
 import { useTonAddress, useTonWallet, useTonConnectModal, useIsConnectionRestored } from "@tonconnect/ui-react";
 
@@ -8,6 +8,22 @@ import { useTonAddress, useTonWallet, useTonConnectModal, useIsConnectionRestore
 function fmtAddr(addr: string, long = false) {
   if (long) return `${addr.slice(0, 12)}…${addr.slice(-10)}`;
   return `${addr.slice(0, 8)}…${addr.slice(-6)}`;
+}
+
+function fmtTon(nano: number): string {
+  const ton = nano / 1e9;
+  if (ton >= 1e6) return (ton / 1e6).toFixed(2) + "M";
+  if (ton >= 1e3) return (ton / 1e3).toFixed(1) + "K";
+  if (ton < 0.001 && ton > 0) return ton.toFixed(6);
+  return ton.toFixed(3);
+}
+
+interface OnChainStats {
+  balanceNano: number | null;
+  totalTxFetched: number;
+  counterpartyCount: number;
+  topCounterparty: { address: string; txCount: number; volumeNano: number } | null;
+  lastActivity: number | null;
 }
 
 /* ════════════════════════════════════════════════════════ */
