@@ -263,7 +263,7 @@ export default function BubbleMap({
   /* ── 2. LOGIQUE DU PAIEMENT ── */
   const triggerBackendRequest = async (walletData: WalletData) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/routes/premium-content`);
+      const response = await fetch(`http://localhost:3001/api/premium-content`);
 
       if (response.status === 402) {
         const invoice = await response.json(); 
