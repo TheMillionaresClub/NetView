@@ -40,26 +40,6 @@ export interface NetworkResult {
   counterparties: Counterparty[];
 }
 
-interface RustTransaction {
-  address: string;
-  action: string;
-  amount: number;
-  timestamp: number;
-  fee: number;
-}
-
-interface WalletProfile {
-  address: string;
-  state: { address: string; balance: number; status: string; wallet_type: string | null; seqno: number | null; is_wallet: boolean } | null;
-  info: { wallet_type: string | null; seqno: number | null; account_state: string } | null;
-  jettons: any[];
-  nfts: any[];
-  dns_names: any[];
-  recent_transactions: RustTransaction[];
-  interacted_wallets: Record<string, string>;
-  classification: { kind: string; confidence: number; signals: string[] };
-}
-
 export interface WalletInfo {
   id: string;
   label: string;
@@ -96,24 +76,6 @@ function edgeKey(a: string, b: string) {
   return a < b ? `edge-${a}-${b}` : `edge-${b}-${a}`;
 }
 
-/** Aggregate recent_transactions into Counterparty[] */
-function aggregateTransactions(txs: RustTransaction[]): Counterparty[] {
-  const map = new Map<string, Counterparty>();
-  for (const tx of txs) {
-    if (!map.has(tx.address)) {
-      map.set(tx.address, { address: tx.address, sentNano: 0, receivedNano: 0, txCount: 0, lastSeen: tx.timestamp });
-    }
-    const cp = map.get(tx.address)!;
-    cp.txCount++;
-    cp.lastSeen = Math.max(cp.lastSeen, tx.timestamp);
-    if (tx.action === "Send") {
-      cp.sentNano += tx.amount;
-    } else {
-      cp.receivedNano += tx.amount;
-    }
-  }
-  return Array.from(map.values());
-}
 
 const THEMES: Record<string, { ring: string; glow: string; bg: string }> = {
   center:   { ring: "border-orange-400", glow: "shadow-[0_0_22px_rgba(249,115,22,.45)]",  bg: "bg-orange-900/60"  },
@@ -456,16 +418,21 @@ export default function BubbleMap({
     w.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  /* -- Fetch full analysis from API -- */
-  const fetchFullAnalysis = useCallback(async (address: string): Promise<WalletProfile | null> => {
+  /* -- Fetch network graph from API -- */
+  const fetchFullAnalysis = useCallback(async (address: string): Promise<{ counterparties: Counterparty[]; totalTxFetched: number; balanceNano: number | null } | null> => {
     try {
       const res = await fetch(
-        `http://localhost:3001/api/wallet-analysis/full?address=${encodeURIComponent(address)}&network=testnet`
+        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`
       );
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Unknown error");
-      return json.result as WalletProfile;
+      const r = json.result;
+      return {
+        counterparties: r.counterparties ?? [],
+        totalTxFetched: r.totalTxFetched ?? 0,
+        balanceNano: r.balanceNano ?? null,
+      };
     } catch (err) {
       console.error("fetchFullAnalysis error:", err);
       return null;
@@ -553,17 +520,13 @@ export default function BubbleMap({
       return;
     }
 
-    const counterparties = aggregateTransactions(profile.recent_transactions);
+    const counterparties = profile.counterparties;
 
-    // Store balance data from interacted_wallets
+    // Store balance for the center wallet
     setWalletBalances((prev) => {
       const next = new Map(prev);
-      for (const [addr, bal] of Object.entries(profile.interacted_wallets)) {
-        next.set(addr, Number(bal));
-      }
-      // Also store this wallet's own balance
-      if (profile.state?.balance != null) {
-        next.set(address, profile.state.balance);
+      if (profile.balanceNano != null) {
+        next.set(address, profile.balanceNano);
       }
       return next;
     });
@@ -578,7 +541,7 @@ export default function BubbleMap({
 
       // Ensure the center/expanded address node exists
       if (!nodeMap.has(address)) {
-        const totalTx = profile.recent_transactions.length;
+        const totalTx = profile.totalTxFetched;
         nodeMap.set(address, {
           id: address,
           type: "person",
@@ -596,7 +559,7 @@ export default function BubbleMap({
       } else {
         const existing = nodeMap.get(address)!;
         const oldTx = existing.data.walletInfo.txCount;
-        const newTx = Math.max(oldTx, profile.recent_transactions.length);
+        const newTx = Math.max(oldTx, profile.totalTxFetched);
         if (newTx > oldTx) {
           const wi = { ...existing.data.walletInfo, txCount: newTx };
           nodeMap.set(address, {
