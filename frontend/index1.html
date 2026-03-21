@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>NetView – Wallet Map</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:      #0a0e14;
+    --bg2:     #0e1520;
+    --panel:   #111822;
+    --border:  #1a2535;
+    --cyan:    #00e5ff;
+    --cyan2:   #00b8d4;
+    --pink:    #e040fb;
+    --green:   #00e676;
+    --red:     #ff1744;
+    --amber:   #ffd740;
+    --text:    #c8d8ec;
+    --muted:   #4a6080;
+    --mono:    'Share Tech Mono', monospace;
+    --sans:    'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+  /* ── HEADER ── */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0; height: 44px;
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px; z-index: 100;
+  }
+  .logo { font-family: var(--sans); font-weight: 700; font-size: 17px; color: var(--cyan); letter-spacing: 2px; }
+  #search-bar {
+    flex: 1; max-width: 260px; margin: 0 12px;
+    background: rgba(0,229,255,.05); border: 1px solid var(--border);
+    border-radius: 4px; padding: 5px 10px;
+    color: var(--text); font-family: var(--mono); font-size: 11px;
+    outline: none; transition: border-color .2s;
+  }
+  #search-bar:focus { border-color: var(--cyan); }
+  #search-bar::placeholder { color: var(--muted); }
+  .hdr-btn {
+    background: none; border: 1px solid var(--border); border-radius: 3px;
+    color: var(--muted); width: 28px; height: 28px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    transition: all .15s;
+  }
+  .hdr-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* ── LEFT SIDEBAR ── */
+  #sidebar {
+    position: fixed; top: 44px; left: 0; bottom: 60px; width: 56px;
+    background: var(--bg2); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0; gap: 4px; z-index: 90;
+  }
+  .chain-btn {
+    width: 40px; height: 40px; border-radius: 6px;
+    border: 1px solid transparent; background: transparent;
+    color: var(--muted); cursor: pointer; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; font-size: 9px; font-family: var(--sans); font-weight: 600;
+    letter-spacing: .5px; transition: all .15s; position: relative;
+  }
+  .chain-btn svg { width: 16px; height: 16px; }
+  .chain-btn.active { background: rgba(0,229,255,.1); border-color: var(--cyan); color: var(--cyan); }
+  .chain-btn.active::before {
+    content: ''; position: absolute; left: -1px; top: 6px; bottom: 6px;
+    width: 2px; background: var(--cyan); border-radius: 0 2px 2px 0;
+  }
+  .chain-btn:hover:not(.active) { color: var(--text); border-color: var(--border); }
+  .sidebar-divider { width: 32px; height: 1px; background: var(--border); margin: 4px 0; }
+  .chain-status { font-size: 8px; color: var(--green); letter-spacing: .5px; }
+
+  /* ── CANVAS AREA ── */
+  #canvas-wrap {
+    position: fixed; top: 44px; left: 56px; right: 0; bottom: 60px; overflow: hidden;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,229,255,.04) 0%, transparent 70%),
+      var(--bg);
+  }
+  /* dot grid */
+  #canvas-wrap::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(circle, rgba(0,229,255,.12) 1px, transparent 1px);
+    background-size: 28px 28px;
+    animation: gridShift 60s linear infinite;
+  }
+  @keyframes gridShift { to { background-position: 28px 28px; } }
+  #canvas { position: absolute; inset: 0; }
+
+  /* ── RIGHT PANEL ── */
+  #info-panel {
+    position: fixed; top: 44px; right: 0; bottom: 60px; width: 220px;
+    background: var(--panel); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+    transform: translateX(100%); transition: transform .25s ease;
+    z-index: 80;
+  }
+  #info-panel.open { transform: translateX(0); }
+  .panel-header { padding: 14px; border-bottom: 1px solid var(--border); }
+  .wallet-name { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .wallet-addr { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .badge {
+    display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 1px;
+    padding: 2px 7px; border: 1px solid; border-radius: 2px; margin-top: 6px;
+  }
+  .badge-whale { color: var(--cyan); border-color: var(--cyan); background: rgba(0,229,255,.08); }
+  .badge-dex   { color: var(--pink); border-color: var(--pink); background: rgba(224,64,251,.08); }
+  .badge-cex   { color: var(--amber); border-color: var(--amber); background: rgba(255,215,64,.08); }
+
+  .panel-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .section-label { font-size: 9px; letter-spacing: 1.5px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: .5px; }
+  .stat-val { font-family: var(--mono); font-size: 11px; color: var(--text); }
+  .stat-val.cyan { color: var(--cyan); }
+  .stat-val.red  { color: var(--red); }
+  .stat-val.big  { font-size: 20px; font-weight: 700; }
+
+  .asset-row { display: flex; align-items: center; gap: 7px; padding: 5px 0; }
+  .asset-icon { width: 18px; height: 18px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; flex-shrink:0; }
+  .asset-name { font-size: 11px; font-weight: 600; flex: 1; }
+  .asset-amount { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  .flow-item { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(26,37,53,.6); }
+  .flow-arrow { width: 16px; height: 16px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-size:9px; flex-shrink:0; margin-top:2px; }
+  .flow-out { background: rgba(255,23,68,.15); color: var(--red); }
+  .flow-in  { background: rgba(0,230,118,.15); color: var(--green); }
+  .flow-body { flex: 1; }
+  .flow-type { font-size: 10px; font-weight: 700; color: var(--text); }
+  .flow-from { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .flow-amount { font-family: var(--mono); font-size: 10px; margin-top: 1px; }
+  .flow-time { font-size: 9px; color: var(--muted); white-space: nowrap; }
+
+  /* ── BOTTOM BAR ── */
+  #bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px; background: var(--bg2); border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+  .legend { display: flex; gap: 14px; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: .5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+  .ld-cex   { background: var(--cyan); }
+  .ld-whale { background: var(--text); }
+  .ld-dex   { background: var(--pink); }
+  #share-btn {
+    background: var(--cyan); color: #000; border: none; cursor: pointer;
+    font-family: var(--sans); font-weight: 700; font-size: 13px; letter-spacing: 2px;
+    padding: 10px 22px; border-radius: 3px; display: flex; align-items: center; gap: 8px;
+    transition: all .15s; text-transform: uppercase;
+  }
+  #share-btn:hover { background: #fff; transform: translateY(-1px); }
+  #share-btn:active { transform: translateY(0); }
+
+  /* ── BUBBLE NODE (SVG foreignObject) ── */
+  .node-card {
+    width: 100%; height: 100%; border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 20px; cursor: pointer; user-select: none;
+    transition: filter .2s; position: relative;
+  }
+  .node-label {
+    position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 9px; color: var(--muted); white-space: nowrap;
+  }
+
+  /* ── TOOLTIP ── */
+  #tooltip {
+    position: fixed; background: rgba(14,21,32,.95);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px; font-size: 10px; pointer-events: none;
+    z-index: 200; display: none; backdrop-filter: blur(8px);
+    font-family: var(--mono);
+  }
+  #tooltip .tt-name { color: var(--cyan); font-weight: 700; font-size: 11px; margin-bottom: 4px; }
+  #tooltip .tt-row  { color: var(--muted); }
+  #tooltip .tt-val  { color: var(--text); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes pulseGlow {
+    0%,100% { filter: drop-shadow(0 0 8px rgba(0,229,255,.5)); }
+    50%      { filter: drop-shadow(0 0 18px rgba(0,229,255,.9)); }
+  }
+  @keyframes flowDash {
+    to { stroke-dashoffset: -20; }
+  }
+  .pulse-primary { animation: pulseGlow 2s ease-in-out infinite; }
+
+  /* panel scroll */
+  #flow-list { overflow-y: auto; flex: 1; padding: 0 14px; }
+  #flow-list::-webkit-scrollbar { width: 3px; }
+  #flow-list::-webkit-scrollbar-track { background: transparent; }
+  #flow-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="logo">NETVIEW</div>
+  <input id="search-bar" placeholder="SEARCH WALLET..." type="text" spellcheck="false"/>
+  <button class="hdr-btn" title="Search" onclick="doSearch()">⌕</button>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div style="font-size:8px;color:var(--muted);letter-spacing:.5px;margin-bottom:4px">NET</div>
+  <button class="chain-btn active" onclick="setChain(this,'ETH')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35zM12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z"/></svg>
+    ETH
+    <div class="chain-status">●</div>
+  </button>
+  <button class="chain-btn" onclick="setChain(this,'SOL')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 17.22l2.35.78L20 6.78l-2.35-.78L4 17.22zm0-5l2.35.78L20 1.78l-2.35-.78L4 12.22zm0 10l2.35.78L20 11.78l-2.35-.78L4 22.22z"/></svg>
+    SOL
+  </button>
+  <button class="chain-btn" onclick="setChain(this,'TON')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    TON
+  </button>
+  <div class="sidebar-divider"></div>
+  <button class="chain-btn" onclick="toggleFilters()" title="Filters">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+    FILTER
+  </button>
+  <button class="chain-btn" title="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    SET
+  </button>
+</div>
+
+<!-- CANVAS -->
+<div id="canvas-wrap">
+  <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<!-- RIGHT PANEL -->
+<div id="info-panel">
+  <div class="panel-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div>
+        <div class="wallet-name" id="pn-name">Nebula.eth</div>
+        <div class="wallet-addr" id="pn-addr">0x71C765...d897</div>
+      </div>
+      <button onclick="closePanel()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0">✕</button>
+    </div>
+    <div class="badge badge-whale" id="pn-badge">WHALE</div>
+  </div>
+  <div class="panel-section">
+    <div class="section-label">METRICS</div>
+    <div class="stat-row">
+      <span class="stat-label">RISK SCORE</span>
+      <span class="stat-val cyan big" id="pn-risk">12.4</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">CENTRALITY</span>
+      <span class="stat-val big" id="pn-centrality">0.88</span>
+    </div>
+  </div>
+  <div class="panel-section">
+    <div class="section-label">ASSETS <span style="float:right;color:var(--text)" id="pn-total">$1,244,902</span></div>
+    <div id="asset-list"></div>
+  </div>
+  <div class="section-label" style="padding:12px 14px 4px">RECENT FLOW</div>
+  <div id="flow-list"></div>
+</div>
+
+<!-- TOOLTIP -->
+<div id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-row">Volume: <span class="tt-val" id="tt-vol"></span></div>
+  <div class="tt-row">Txns: <span class="tt-val" id="tt-txn"></span></div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottom-bar">
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot ld-cex"></div>CEX</div>
+    <div class="legend-item"><div class="legend-dot ld-whale"></div>WHALE</div>
+    <div class="legend-item"><div class="legend-dot ld-dex"></div>DEX</div>
+  </div>
+  <button id="share-btn" onclick="shareView()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    SHARE VIEW
+  </button>
+</div>
+
+<script>
+// ── Telegram WebApp init ─────────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.setHeaderColor('#0a0e14'); }
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const WALLETS = {
+  'nebula.eth': {
+    name: 'Nebula.eth', addr: '0x71C765...d897', type: 'whale',
+    risk: 12.4, centrality: 0.88, total: '$1,244,902',
+    assets: [
+      { sym:'WBTC', amount:'12.45', color:'#F7931A', icon:'₿' },
+      { sym:'USDC', amount:'450,230', color:'#2775CA', icon:'$' },
+      { sym:'ETH',  amount:'2,104.9', color:'#627EEA', icon:'Ξ' },
+    ],
+    flows: [
+      { dir:'out', type:'TRANSFER OUT', from:'To: Binance_Hot_01', amount:'- 50,000 USDC', time:'2m ago' },
+      { dir:'in',  type:'SWAP IN',      from:'From: Uniswap V3',   amount:'+ 2.4 WBTC',   time:'14m ago' },
+      { dir:'in',  type:'RECEIVE',      from:'From: 0x82...a11',   amount:'+ 1,000 ETH',  time:'1h ago' },
+    ]
+  },
+  'binance_hot': {
+    name: 'Binance_Hot_01', addr: '0xBE0eb5...3f1d', type: 'cex',
+    risk: 2.1, centrality: 0.96, total: '$82,400,000',
+    assets: [
+      { sym:'USDC', amount:'40,000,000', color:'#2775CA', icon:'$' },
+      { sym:'ETH',  amount:'12,400',     color:'#627EEA', icon:'Ξ' },
+    ],
+    flows: [
+      { dir:'in',  type:'RECEIVE',   from:'From: Nebula.eth', amount:'+ 50,000 USDC', time:'2m ago' },
+      { dir:'out', type:'WITHDRAW',  from:'To: Cold Wallet',  amount:'- 1,200 ETH',   time:'6h ago' },
+    ]
+  },
+  'uniswap_v3': {
+    name: 'Uniswap V3', addr: '0x1F98...3b3b', type: 'dex',
+    risk: 1.0, centrality: 0.74, total: '$5,200,000,000',
+    assets: [
+      { sym:'ETH',  amount:'820,000',    color:'#627EEA', icon:'Ξ' },
+      { sym:'USDC', amount:'1,400,000,000', color:'#2775CA', icon:'$' },
+    ],
+    flows: [
+      { dir:'out', type:'SWAP OUT', from:'To: Nebula.eth',  amount:'+ 2.4 WBTC', time:'14m ago' },
+      { dir:'in',  type:'SWAP IN',  from:'From: Whale_09',  amount:'+ 80 ETH',   time:'22m ago' },
+    ]
+  },
+  'whale_09': {
+    name: 'WHALE_09', addr: '0xA9D1...22cc', type: 'whale',
+    risk: 34.8, centrality: 0.61, total: '$8,900,000',
+    assets: [
+      { sym:'ETH', amount:'3,220',   color:'#627EEA', icon:'Ξ' },
+      { sym:'DAI', amount:'400,000', color:'#F5AC37', icon:'◈' },
+    ],
+    flows: [
+      { dir:'out', type:'SWAP OUT', from:'To: Uniswap V3', amount:'- 80 ETH',   time:'22m ago' },
+      { dir:'in',  type:'RECEIVE',  from:'From: Unknown',  amount:'+ 500 ETH',  time:'3h ago' },
+    ]
+  },
+  'anon': {
+    name: 'ANON_USER', addr: '0x3f4a...9921', type: 'whale',
+    risk: 67.2, centrality: 0.22, total: '$120,000',
+    assets: [
+      { sym:'ETH', amount:'48.2', color:'#627EEA', icon:'Ξ' },
+    ],
+    flows: [
+      { dir:'in', type:'RECEIVE', from:'From: Nebula.eth', amount:'+ 12 ETH', time:'5h ago' },
+    ]
+  }
+};
+
+// ── Graph layout ──────────────────────────────────────────────────────────────
+const NODES = [
+  { id:'nebula',     key:'nebula.eth',    label:'0x...1234 (PRIMARY)', type:'whale',  size:72, primary:true  },
+  { id:'binance',    key:'binance_hot',   label:'BINANCE_HOT',         type:'cex',    size:52 },
+  { id:'uniswap',    key:'uniswap_v3',    label:'UNISWAP_V3',          type:'dex',    size:44 },
+  { id:'whale09',    key:'whale_09',      label:'WHALE_09',            type:'whale',  size:50 },
+  { id:'anon',       key:'anon',          label:'ANON',                type:'whale',  size:28 },
+];
+
+const EDGES = [
+  { from:'nebula', to:'binance',  vol:'$50K',  label:'-50K USDC', dir:'out' },
+  { from:'nebula', to:'uniswap',  vol:'$8K',   label:'+2.4 WBTC', dir:'in'  },
+  { from:'nebula', to:'whale09',  vol:'$18K',  label:'flow',       dir:'both'},
+  { from:'nebula', to:'anon',     vol:'$2K',   label:'receive',    dir:'in'  },
+  { from:'whale09', to:'uniswap', vol:'$120K', label:'-80 ETH',    dir:'out' },
+];
+
+const TYPE_COLORS = { whale:'#c8d8ec', cex:'#00e5ff', dex:'#e040fb' };
+const TYPE_ICONS  = {
+  whale: `<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M21 9c0-1.1-.9-2-2-2H5C3.9 7 3 7.9 3 9v4c0 2.2 1.8 4 4 4h10c2.2 0 4-1.8 4-4V9zm-3 2c0 .6-.4 1-1 1s-1-.4-1-1 .4-1 1-1 1 .4 1 1z"/></svg>`,
+  cex:   `<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>`,
+  dex:   `<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>`,
+};
+
+// ── SVG Renderer ──────────────────────────────────────────────────────────────
+const svg = document.getElementById('canvas');
+let W, H, positions = {}, dragging = null, dragOffset = {x:0,y:0}, panStart = null, panOffset = {x:0,y:0}, scale=1;
+let selectedNode = null;
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  layoutNodes();
+  render();
+}
+
+function layoutNodes() {
+  const cx = W/2, cy = H/2;
+  positions['nebula'] = { x: cx, y: cy };
+  const rings = [
+    ['binance', 'whale09'],
+    ['uniswap'],
+    ['anon'],
+  ];
+  const angles = [ [-130,-40], [60], [160] ];
+  rings.forEach((group, gi) => {
+    group.forEach((id, i) => {
+      const r = 190 + gi*20;
+      const a = (angles[gi][i] || 0) * Math.PI/180;
+      positions[id] = { x: cx + r*Math.cos(a), y: cy + r*Math.sin(a) };
+    });
+  });
+  // spread uniswap right, anon bottom-left
+  positions['uniswap'] = { x: cx+195, y: cy+85 };
+  positions['anon']    = { x: cx-185, y: cy+95 };
+}
+
+function getEdgeColor(dir) {
+  if (dir==='out')  return '#ff174480';
+  if (dir==='in')   return '#00e67680';
+  return '#00e5ff40';
+}
+
+function render() {
+  svg.innerHTML = '';
+  // defs
+  const defs = mkEl('defs');
+  // arrow markers
+  ['out','in','both'].forEach(dir => {
+    const m = mkEl('marker');
+    m.setAttribute('id',`arrow-${dir}`);
+    m.setAttribute('viewBox','0 0 10 10');
+    m.setAttribute('refX','8'); m.setAttribute('refY','5');
+    m.setAttribute('markerWidth','5'); m.setAttribute('markerHeight','5');
+    m.setAttribute('orient','auto-start-reverse');
+    const p = mkEl('path');
+    p.setAttribute('d','M2,2 L8,5 L2,8');
+    p.setAttribute('fill','none');
+    p.setAttribute('stroke', dir==='out'?'#ff1744':dir==='in'?'#00e676':'#00e5ff');
+    p.setAttribute('stroke-width','1.5');
+    m.appendChild(p); defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  // group for pan/zoom
+  const g = mkEl('g');
+  g.setAttribute('id','scene');
+  g.setAttribute('transform', `translate(${panOffset.x},${panOffset.y}) scale(${scale})`);
+  svg.appendChild(g);
+
+  // edges
+  EDGES.forEach(e => {
+    const a = positions[e.from], b = positions[e.to];
+    if (!a||!b) return;
+    const mid = { x:(a.x+b.x)/2, y:(a.y+b.y)/2 };
+
+    const line = mkEl('line');
+    line.setAttribute('x1',a.x); line.setAttribute('y1',a.y);
+    line.setAttribute('x2',b.x); line.setAttribute('y2',b.y);
+    line.setAttribute('stroke', getEdgeColor(e.dir));
+    line.setAttribute('stroke-width','1.5');
+    line.setAttribute('stroke-dasharray','6 4');
+    line.style.animation = 'flowDash 1.5s linear infinite';
+    line.setAttribute('marker-end', `url(#arrow-${e.dir})`);
+    g.appendChild(line);
+
+    // vol label
+    const txt = mkEl('text');
+    txt.setAttribute('x', mid.x); txt.setAttribute('y', mid.y-5);
+    txt.setAttribute('text-anchor','middle');
+    txt.setAttribute('font-family','Share Tech Mono,monospace');
+    txt.setAttribute('font-size','9');
+    txt.setAttribute('fill','rgba(72,100,130,.9)');
+    txt.textContent = e.label;
+    g.appendChild(txt);
+  });
+
+  // nodes
+  NODES.forEach(n => {
+    const pos = positions[n.id];
+    if (!pos) return;
+    const s = n.size;
+    const half = s/2;
+    const color = TYPE_COLORS[n.type];
+    const isSelected = selectedNode===n.id;
+    const isPrimary = n.primary;
+
+    const grp = mkEl('g');
+    grp.setAttribute('class', isPrimary ? 'pulse-primary' : '');
+    grp.style.cursor = 'pointer';
+    grp.setAttribute('data-id', n.id);
+
+    // glow bg
+    if (isPrimary || isSelected) {
+      const glow = mkEl('rect');
+      glow.setAttribute('x', pos.x-half-10); glow.setAttribute('y', pos.y-half-10);
+      glow.setAttribute('width', s+20); glow.setAttribute('height', s+20);
+      glow.setAttribute('rx','14');
+      glow.setAttribute('fill', isPrimary ? 'rgba(0,229,255,.12)' : 'rgba(255,255,255,.06)');
+      grp.appendChild(glow);
+    }
+
+    // card rect
+    const rect = mkEl('rect');
+    rect.setAttribute('x', pos.x-half); rect.setAttribute('y', pos.y-half);
+    rect.setAttribute('width', s); rect.setAttribute('height', s);
+    rect.setAttribute('rx','8');
+    const bgColor = n.type==='cex' ? 'rgba(0,229,255,.85)' :
+                    n.type==='dex' ? 'rgba(224,64,251,.8)'  :
+                    isSelected     ? 'rgba(50,70,100,.95)'  : 'rgba(18,28,45,.92)';
+    rect.setAttribute('fill', bgColor);
+    rect.setAttribute('stroke', isSelected ? '#fff' : color);
+    rect.setAttribute('stroke-width', isPrimary ? '2.5' : '1.5');
+    grp.appendChild(rect);
+
+    // icon via foreignObject
+    const fo = mkEl('foreignObject');
+    fo.setAttribute('x', pos.x-half); fo.setAttribute('y', pos.y-half);
+    fo.setAttribute('width', s); fo.setAttribute('height', s);
+    const iconDiv = document.createElementNS('http://www.w3.org/1999/xhtml','div');
+    iconDiv.style.cssText = `width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:${n.type==='cex'||n.type==='dex'?'rgba(0,0,0,.7)':color};`;
+    iconDiv.innerHTML = TYPE_ICONS[n.type];
+    fo.appendChild(iconDiv);
+    grp.appendChild(fo);
+
+    // label
+    const lbl = mkEl('text');
+    lbl.setAttribute('x', pos.x); lbl.setAttribute('y', pos.y+half+14);
+    lbl.setAttribute('text-anchor','middle');
+    lbl.setAttribute('font-family','Share Tech Mono,monospace');
+    lbl.setAttribute('font-size','9'); lbl.setAttribute('fill','#4a6080');
+    lbl.textContent = n.label;
+    grp.appendChild(lbl);
+
+    // event listeners
+    grp.addEventListener('click', () => selectNode(n));
+    grp.addEventListener('mouseenter', (e) => showTooltip(e, n));
+    grp.addEventListener('mouseleave', hideTooltip);
+    grp.addEventListener('touchstart', (e) => { e.preventDefault(); showTooltip(e.touches[0], n); selectNode(n); }, {passive:false});
+
+    // drag
+    grp.addEventListener('mousedown', ev => startDrag(ev, n.id));
+    grp.addEventListener('touchstart', ev => startDragTouch(ev, n.id), {passive:false});
+
+    g.appendChild(grp);
+  });
+}
+
+function mkEl(tag) {
+  return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
+// ── Interaction ───────────────────────────────────────────────────────────────
+function selectNode(n) {
+  selectedNode = n.id;
+  const data = WALLETS[n.key];
+  if (data) openPanel(data);
+  render();
+}
+
+function openPanel(data) {
+  document.getElementById('pn-name').textContent = data.name;
+  document.getElementById('pn-addr').textContent = data.addr;
+  document.getElementById('pn-risk').textContent = data.risk;
+  document.getElementById('pn-centrality').textContent = data.centrality;
+  document.getElementById('pn-total').textContent = data.total;
+  const badge = document.getElementById('pn-badge');
+  badge.textContent = data.type.toUpperCase();
+  badge.className = `badge badge-${data.type}`;
+
+  const assetList = document.getElementById('asset-list');
+  assetList.innerHTML = data.assets.map(a=>`
+    <div class="asset-row">
+      <div class="asset-icon" style="background:${a.color}20;color:${a.color}">${a.icon}</div>
+      <div class="asset-name">${a.sym}</div>
+      <div class="asset-amount">${a.amount}</div>
+    </div>`).join('');
+
+  const flowList = document.getElementById('flow-list');
+  flowList.innerHTML = data.flows.map(f=>`
+    <div class="flow-item">
+      <div class="flow-arrow ${f.dir==='out'?'flow-out':'flow-in'}">${f.dir==='out'?'↗':'↙'}</div>
+      <div class="flow-body">
+        <div class="flow-type">${f.type}</div>
+        <div class="flow-from">${f.from}</div>
+        <div class="flow-amount" style="color:${f.dir==='out'?'var(--red)':'var(--green)'}">${f.amount}</div>
+      </div>
+      <div class="flow-time">${f.time}</div>
+    </div>`).join('');
+
+  document.getElementById('info-panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('info-panel').classList.remove('open');
+  selectedNode = null;
+  render();
+}
+
+function showTooltip(e, n) {
+  const data = WALLETS[n.key];
+  if (!data) return;
+  const tt = document.getElementById('tooltip');
+  document.getElementById('tt-name').textContent = data.name;
+  document.getElementById('tt-vol').textContent  = data.total;
+  document.getElementById('tt-txn').textContent  = data.flows.length + ' recent';
+  tt.style.display = 'block';
+  tt.style.left = (e.clientX+12)+'px';
+  tt.style.top  = (e.clientY-10)+'px';
+}
+function hideTooltip() { document.getElementById('tooltip').style.display='none'; }
+
+// ── Drag nodes ────────────────────────────────────────────────────────────────
+function startDrag(e, id) {
+  dragging = id;
+  dragOffset = { x: e.clientX - positions[id].x, y: e.clientY - positions[id].y };
+  e.stopPropagation();
+}
+function startDragTouch(e, id) {
+  if (e.touches.length===1) {
+    dragging = id;
+    dragOffset = { x: e.touches[0].clientX - positions[id].x, y: e.touches[0].clientY - positions[id].y };
+  }
+}
+document.addEventListener('mousemove', e => {
+  if (dragging) {
+    positions[dragging] = { x: e.clientX-dragOffset.x, y: e.clientY-dragOffset.y };
+    render();
+  }
+});
+document.addEventListener('mouseup',  () => { dragging=null; });
+document.addEventListener('touchmove', e => {
+  if (dragging&&e.touches.length===1) {
+    positions[dragging] = { x:e.touches[0].clientX-dragOffset.x, y:e.touches[0].clientY-dragOffset.y };
+    render();
+  }
+},{passive:true});
+document.addEventListener('touchend',  () => { dragging=null; });
+
+// ── Search ────────────────────────────────────────────────────────────────────
+document.getElementById('search-bar').addEventListener('keydown', e => {
+  if (e.key==='Enter') doSearch();
+});
+function doSearch() {
+  const q = document.getElementById('search-bar').value.trim().toLowerCase();
+  if (!q) return;
+  const found = Object.keys(WALLETS).find(k => WALLETS[k].name.toLowerCase().includes(q) || WALLETS[k].addr.toLowerCase().includes(q));
+  if (found) {
+    const node = NODES.find(n=>n.key===found);
+    if (node) selectNode(node);
+  }
+}
+
+function setChain(btn, chain) {
+  document.querySelectorAll('.chain-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleFilters() {}
+
+function shareView() {
+  if (tg) {
+    tg.showPopup({ title:'Share NetView', message:'Share this wallet network analysis?',
+      buttons:[{type:'ok',text:'Share'},{type:'cancel'}] }, btn => {
+      if (btn==='ok') tg.switchInlineQuery('NetView wallet analysis', ['users','groups']);
+    });
+  } else {
+    alert('NetView – Wallet Network Map\nShared!');
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', resize);
+resize();
+
+// Auto-select primary wallet on load
+setTimeout(() => {
+  const primary = NODES.find(n=>n.primary);
+  if (primary) selectNode(primary);
+}, 400);
+</script>
+</body>
+</html>
