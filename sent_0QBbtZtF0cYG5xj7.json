@@ -1,0 +1,74 @@
+{
+  "source_wallet": "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_",
+  "network": "testnet",
+  "total_transactions_scanned": 7,
+  "unique_destinations": 3,
+  "total_ton_sent": 0.0604,
+  "generated_at": "2026-03-21T14:37:33.435335+00:00",
+  "destinations": [
+    {
+      "address": "EQAyni3YDAhs7c-7imWvPyEbMEeVPMX8eWDLQ5GUe-B-BrkW",
+      "total_sent_nano": 49600000,
+      "total_sent_ton": 0.0496,
+      "tx_count": 1,
+      "first_seen": 1774087323,
+      "last_seen": 1774087323,
+      "messages": [
+        {
+          "value_nano": 49600000,
+          "value_ton": 0.0496,
+          "timestamp": 1774087323,
+          "date": "2026-03-21T10:02:03+00:00",
+          "comment": "/////wAAAADwn5KOIHRnOiBAYnV5VE5fYm90IChnZXQgdGUA\n"
+        }
+      ],
+      "first_seen_date": "2026-03-21T10:02:03+00:00",
+      "last_seen_date": "2026-03-21T10:02:03+00:00"
+    },
+    {
+      "address": "EQD_N0hrgbiQzAh72500KZbYU76VOOEg5RxIu4unxZGhAdXC",
+      "total_sent_nano": 9600000,
+      "total_sent_ton": 0.0096,
+      "tx_count": 1,
+      "first_seen": 1774087307,
+      "last_seen": 1774087307,
+      "messages": [
+        {
+          "value_nano": 9600000,
+          "value_ton": 0.0096,
+          "timestamp": 1774087307,
+          "date": "2026-03-21T10:01:47+00:00",
+          "comment": "/////wAAAABodHRwczovL3QubWUvdG5mYXVjZXRfYm90IC0A\n"
+        }
+      ],
+      "first_seen_date": "2026-03-21T10:01:47+00:00",
+      "last_seen_date": "2026-03-21T10:01:47+00:00"
+    },
+    {
+      "address": "EQCxEal2I247XpkKJQQGCYvmDqfBokLNQFWndLEG2rlo5yfJ",
+      "total_sent_nano": 1200000,
+      "total_sent_ton": 0.0012,
+      "tx_count": 2,
+      "first_seen": 1773337045,
+      "last_seen": 1774085988,
+      "messages": [
+        {
+          "value_nano": 600000,
+          "value_ton": 0.0006,
+          "timestamp": 1774085988,
+          "date": "2026-03-21T09:39:48+00:00",
+          "comment": "/////wAAAABHZXQgMzAwIHRlc3RuZXQgVE9OIHwgVEc6IEAA\n"
+        },
+        {
+          "value_nano": 600000,
+          "value_ton": 0.0006,
+          "timestamp": 1773337045,
+          "date": "2026-03-12T17:37:25+00:00",
+          "comment": "/////wAAAABHZXQgMzAwIHRlc3RuZXQgVE9OIHwgVEc6IEAA\n"
+        }
+      ],
+      "first_seen_date": "2026-03-12T17:37:25+00:00",
+      "last_seen_date": "2026-03-21T09:39:48+00:00"
+    }
+  ]
+}
