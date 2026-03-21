@@ -8,6 +8,11 @@
     "start": "next start --port 3002"
   },
   "dependencies": {
+    "@ton-x402/client": "workspace:*",
+    "@ton-x402/core": "workspace:*",
+    "@ton/core": "^0.62.1",
+    "@ton/crypto": "^3.3.0",
+    "@ton/ton": "^15.4.0",
     "@tonconnect/ui-react": "^2.4.2",
     "@xyflow/react": "^12.10.1",
     "html-to-image": "^1.11.13",
