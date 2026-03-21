@@ -105,8 +105,6 @@ def fetch_all_transactions(base_url: str, address: str, api_key: str, max_txs: i
         last_lt = last_tx["transaction_id"]["lt"]
         # Pass hash as-is (base64) — urlencode handles special chars
         last_hash = last_tx["transaction_id"]["hash"]
-        except Exception:
-            last_hash = raw_hash
 
         # Rate-limit courtesy
         time.sleep(0.3)
