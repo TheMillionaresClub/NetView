@@ -247,7 +247,7 @@ export default function BubbleMap({
                 onSelect: setSelected,
               },
             };
-          });
+          }); 
 
           setNodes([mainNode, ...newNodes]);
 
