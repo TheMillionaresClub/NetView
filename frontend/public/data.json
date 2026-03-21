@@ -1,87 +1,30 @@
-[
-  {
-    "id": "user_1",
-    "name": "Karim",
-    "type": "primary",
-    "totalVolume": 45200,
-    "totalTransactions": 128,
-    "topTokens": [
-      { "symbol": "ETH", "balance": 12.5 },
-      { "symbol": "USDT", "balance": 15000 },
-      { "symbol": "SOL", "balance": 45 }
-    ],
-    "recentTransactions": [
-      { "action": "SWAP", "amount": 1200, "token": "USDT", "time": "2 mins ago" },
-      { "action": "RECEIVE", "amount": 5.2, "token": "ETH", "time": "1 hour ago" },
-      { "action": "SEND", "amount": 300, "token": "USDC", "time": "3 hours ago" }
-    ]
-  },
-  {
-    "id": "user_2",
-    "name": "Alice",
-    "type": "whale",
-    "totalVolume": 850000,
-    "totalTransactions": 42,
-    "topTokens": [
-      { "symbol": "WBTC", "balance": 4.5 },
-      { "symbol": "ETH", "balance": 120 },
-      { "symbol": "LINK", "balance": 5000 }
-    ],
-    "recentTransactions": [
-      { "action": "BUY", "amount": 25000, "token": "ETH", "time": "12 secs ago" },
-      { "action": "STAKE", "amount": 100000, "token": "USDT", "time": "5 mins ago" },
-      { "action": "SWAP", "amount": 5000, "token": "LINK", "time": "1 day ago" }
-    ]
-  },
-  {
-    "id": "user_3",
-    "name": "Thomas",
-    "type": "trader",
-    "totalVolume": 125000,
-    "totalTransactions": 985,
-    "topTokens": [
-      { "symbol": "USDT", "balance": 85000 },
-      { "symbol": "BTC", "balance": 1.2 },
-      { "symbol": "BNB", "balance": 45 }
-    ],
-    "recentTransactions": [
-      { "action": "WITHDRAW", "amount": 4500, "token": "USDT", "time": "Just now" },
-      { "action": "DEPOSIT", "amount": 0.5, "token": "BTC", "time": "1 min ago" },
-      { "action": "WITHDRAW", "amount": 120, "token": "SOL", "time": "1 min ago" }
-    ]
-  },
-  {
-    "id": "user_4",
-    "name": "Sarah",
-    "type": "degen",
-    "totalVolume": 1500,
-    "totalTransactions": 854,
-    "topTokens": [
-      { "symbol": "PEPE", "balance": 45000000 },
-      { "symbol": "WIF", "balance": 1200 },
-      { "symbol": "SOL", "balance": 2.5 }
-    ],
-    "recentTransactions": [
-      { "action": "SWAP", "amount": 50, "token": "PEPE", "time": "5 mins ago" },
-      { "action": "SWAP", "amount": 100, "token": "WIF", "time": "10 mins ago" },
-      { "action": "APPROVE", "amount": 0, "token": "USDC", "time": "1 hour ago" }
-    ]
-  },
-  {
-    "id": "user_5",
-    "name": "Marc",
-    "type": "investor",
-    "totalVolume": 45000,
-    "totalTransactions": 154,
-    "topTokens": [
-      { "symbol": "USDC", "balance": 25000 },
-      { "symbol": "ETH", "balance": 8.5 },
-      { "symbol": "DAI", "balance": 4500 }
-    ],
-    "recentTransactions": [
-      { "action": "POOL_ADD", "amount": 15000, "token": "USDC", "time": "30 secs ago" },
-      { "action": "SWAP", "amount": 450, "token": "ETH", "time": "1 min ago" },
-      { "action": "ROUTE", "amount": 1200, "token": "DAI", "time": "2 mins ago" }
-    ]
-  }
+[ {"id": "user_1", "name": "Karim", "type": "investor", "totalVolume": 9040, "totalTransactions": 128, "topTokens": [{ "symbol": "TON", "balance": 1500 }], "recentTransactions": [{ "action": "SEND", "amount": 250, "token": "TON", "time": "2 mins ago", "with": "me" },{ "action": "RECEIVE", "amount": 100, "token": "TON", "time": "1 hour ago", "with": "me" }]}, { "id": "user_2", "name": "Alice", "type": "whale", "totalVolume": 170000, "totalTransactions": 42, "topTokens": [{ "symbol": "TON", "balance": 45000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 5000, "token": "TON", "time": "12 secs ago", "with": "me" }, { "action": "SEND", "amount": 1000, "token": "jUSDT", "time": "1 day ago", "with": "user_5" }] },
+  { "id": "user_3", "name": "Thomas", "type": "trader", "totalVolume": 25000, "totalTransactions": 985, "topTokens": [{ "symbol": "jUSDT", "balance": 18000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 900, "token": "TON", "time": "Just now", "with": "me" }] },
+  { "id": "user_4", "name": "Sarah", "type": "degen", "totalVolume": 300, "totalTransactions": 854, "topTokens": [{ "symbol": "REDO", "balance": 45000000 }], "recentTransactions": [{ "action": "SEND", "amount": 10, "token": "TON", "time": "5 mins ago", "with": "me" }] },
+  { "id": "user_5", "name": "Marc", "type": "investor", "totalVolume": 9000, "totalTransactions": 154, "topTokens": [{ "symbol": "TON", "balance": 2500 }], "recentTransactions": [{ "action": "SEND", "amount": 450, "token": "TON", "time": "1 min ago", "with": "me" }] },
+  { "id": "user_6", "name": "Ghost", "type": "primary", "totalVolume": 12, "totalTransactions": 3, "topTokens": [{ "symbol": "TON", "balance": 2 }], "recentTransactions": [] },
+  { "id": "user_7", "name": "Elena", "type": "investor", "totalVolume": 54000, "totalTransactions": 312, "topTokens": [{ "symbol": "TON", "balance": 12000 }], "recentTransactions": [{ "action": "SEND", "amount": 1200, "token": "STON", "time": "2 hours ago", "with": "user_2" }] },
+  { "id": "user_8", "name": "Bob", "type": "degen", "totalVolume": 450, "totalTransactions": 1205, "topTokens": [{ "symbol": "FISH", "balance": 900000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 15, "token": "TON", "time": "4 mins ago", "with": "user_4" }] },
+  { "id": "user_9", "name": "Vitalik", "type": "whale", "totalVolume": 950000, "totalTransactions": 12, "topTokens": [{ "symbol": "TON", "balance": 850000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 100000, "token": "TON", "time": "3 hours ago", "with": "me" }] },
+  { "id": "user_10", "name": "Chen", "type": "trader", "totalVolume": 88000, "totalTransactions": 4400, "topTokens": [{ "symbol": "jUSDT", "balance": 50000 }], "recentTransactions": [{ "action": "SEND", "amount": 1200, "token": "jUSDT", "time": "15 mins ago", "with": "user_2" }] },
+  { "id": "user_11", "name": "Dmitry", "type": "investor", "totalVolume": 15000, "totalTransactions": 89, "topTokens": [{ "symbol": "SCALE", "balance": 45000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 500, "token": "TON", "time": "1 day ago", "with": "me" }] },
+  { "id": "user_12", "name": "Luna", "type": "primary", "totalVolume": 2500, "totalTransactions": 45, "topTokens": [{ "symbol": "STON", "balance": 1200 }], "recentTransactions": [{ "action": "SEND", "amount": 150, "token": "STON", "time": "2 days ago", "with": "me" }] },
+  { "id": "user_13", "name": "Satoshi", "type": "whale", "totalVolume": 3500000, "totalTransactions": 1, "topTokens": [{ "symbol": "TON", "balance": 3500000 }], "recentTransactions": [] },
+  { "id": "user_14", "name": "Chloe", "type": "degen", "totalVolume": 120, "totalTransactions": 3500, "topTokens": [{ "symbol": "DOGS", "balance": 15000 }], "recentTransactions": [{ "action": "SEND", "amount": 5, "token": "TON", "time": "1 min ago", "with": "user_8" }] },
+  { "id": "user_15", "name": "Omar", "type": "trader", "totalVolume": 45000, "totalTransactions": 650, "topTokens": [{ "symbol": "USDT", "balance": 25000 }], "recentTransactions": [{ "action": "SEND", "amount": 400, "token": "USDT", "time": "20 mins ago", "with": "me" }] },
+  { "id": "user_16", "name": "Pavel", "type": "whale", "totalVolume": 1200000, "totalTransactions": 80, "topTokens": [{ "symbol": "TON", "balance": 900000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 50000, "token": "TON", "time": "1 week ago", "with": "me" }] },
+  { "id": "user_17", "name": "Yuki", "type": "investor", "totalVolume": 18000, "totalTransactions": 210, "topTokens": [{ "symbol": "SCALE", "balance": 30000 }], "recentTransactions": [{ "action": "SEND", "amount": 100, "token": "TON", "time": "5 hours ago", "with": "user_9" }] },
+  { "id": "user_18", "name": "Liam", "type": "primary", "totalVolume": 500, "totalTransactions": 12, "topTokens": [{ "symbol": "TON", "balance": 150 }], "recentTransactions": [] },
+  { "id": "user_19", "name": "Emma", "type": "trader", "totalVolume": 67000, "totalTransactions": 1100, "topTokens": [{ "symbol": "jUSDT", "balance": 45000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 2000, "token": "jUSDT", "time": "10 mins ago", "with": "me" }] },
+  { "id": "user_20", "name": "Noah", "type": "degen", "totalVolume": 850, "totalTransactions": 2200, "topTokens": [{ "symbol": "REDO", "balance": 12000000 }], "recentTransactions": [{ "action": "SEND", "amount": 25, "token": "TON", "time": "1 min ago", "with": "user_14" }] },
+  { "id": "user_21", "name": "Mia", "type": "investor", "totalVolume": 11000, "totalTransactions": 95, "topTokens": [{ "symbol": "STON", "balance": 8000 }], "recentTransactions": [{ "action": "SEND", "amount": 350, "token": "STON", "time": "2 days ago", "with": "me" }] },
+  { "id": "user_22", "name": "James", "type": "whale", "totalVolume": 420000, "totalTransactions": 65, "topTokens": [{ "symbol": "TON", "balance": 250000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 15000, "token": "TON", "time": "4 hours ago", "with": "user_16" }] },
+  { "id": "user_23", "name": "Charlotte", "type": "primary", "totalVolume": 3400, "totalTransactions": 55, "topTokens": [{ "symbol": "TON", "balance": 800 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 100, "token": "TON", "time": "15 hours ago", "with": "me" }] },
+  { "id": "user_24", "name": "Lucas", "type": "trader", "totalVolume": 95000, "totalTransactions": 3200, "topTokens": [{ "symbol": "jUSDT", "balance": 75000 }], "recentTransactions": [{ "action": "SEND", "amount": 5000, "token": "jUSDT", "time": "1 min ago", "with": "user_22" }] },
+  { "id": "user_25", "name": "Amelia", "type": "investor", "totalVolume": 22000, "totalTransactions": 180, "topTokens": [{ "symbol": "SCALE", "balance": 50000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 800, "token": "TON", "time": "6 hours ago", "with": "me" }] },
+  { "id": "user_26", "name": "Hassan", "type": "degen", "totalVolume": 600, "totalTransactions": 1500, "topTokens": [{ "symbol": "FISH", "balance": 2500000 }], "recentTransactions": [{ "action": "SEND", "amount": 50, "token": "TON", "time": "Just now", "with": "user_4" }] },
+  { "id": "user_27", "name": "Wei", "type": "whale", "totalVolume": 650000, "totalTransactions": 110, "topTokens": [{ "symbol": "TON", "balance": 400000 }], "recentTransactions": [{ "action": "SEND", "amount": 25000, "token": "TON", "time": "1 day ago", "with": "me" }] },
+  { "id": "user_28", "name": "Isabella", "type": "primary", "totalVolume": 1800, "totalTransactions": 25, "topTokens": [{ "symbol": "TON", "balance": 600 }], "recentTransactions": [] },
+  { "id": "user_29", "name": "Jack", "type": "trader", "totalVolume": 52000, "totalTransactions": 890, "topTokens": [{ "symbol": "USDT", "balance": 35000 }], "recentTransactions": [{ "action": "RECEIVE", "amount": 1500, "token": "USDT", "time": "12 mins ago", "with": "me" }] },
+  { "id": "user_30", "name": "Sophia", "type": "investor", "totalVolume": 14000, "totalTransactions": 134, "topTokens": [{ "symbol": "STON", "balance": 4000 }], "recentTransactions": [{ "action": "SEND", "amount": 200, "token": "STON", "time": "3 hours ago", "with": "me" }] }
 ]
