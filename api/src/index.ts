@@ -2,12 +2,14 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
-import jokeRouter from "./routes/joke.js";
-import weatherRouter from "./routes/weather.js";
-import premiumContentRouter from "./routes/premium-content.js";
-import facilitatorRouter from "./routes/facilitator.js";
-
+// Load env vars BEFORE importing routes (they read process.env at config time)
 dotenv.config();
+
+// Dynamic imports to ensure env vars are loaded first
+const { default: jokeRouter } = await import("./routes/joke.js");
+const { default: weatherRouter } = await import("./routes/weather.js");
+const { default: premiumContentRouter } = await import("./routes/premium-content.js");
+const { default: facilitatorRouter } = await import("./routes/facilitator.js");
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
