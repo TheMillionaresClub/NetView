@@ -34,10 +34,11 @@ const transactions = [
   },
 ];
 
+
 export default function DetailsPanel() {
   return (
     <aside className="fixed right-0 top-14 bottom-0 w-80 bg-surface border-l border-none shadow-2xl flex flex-col z-40 overflow-y-auto">
-      {/* Header Section */}
+      /{/* Header Section */}
       <div className="p-6 border-b border-surface-container-highest">
         <div className="flex justify-between items-start mb-4">
           <div>
