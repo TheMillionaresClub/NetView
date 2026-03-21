@@ -1,0 +1,9 @@
+/* @ts-self-types="./wallet_info.d.ts" */
+
+import * as wasm from "./wallet_info_bg.wasm";
+import { __wbg_set_wasm } from "./wallet_info_bg.js";
+__wbg_set_wasm(wasm);
+wasm.__wbindgen_start();
+export {
+    get_address_information
+} from "./wallet_info_bg.js";
