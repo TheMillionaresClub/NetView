@@ -5,6 +5,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  Panel,
   useNodesState,
   useEdgesState,
   Handle,
@@ -269,6 +270,149 @@ function saveToStorage(nodes: any[], edges: any[], centerAddress: string, expand
 }
 
 /* ================================================================
+   FORCE-DIRECTED LAYOUT  (Coggle-style realign)
+   Pure frontend — no external deps. Iterative simulation:
+   1. Repulsion between every pair of nodes (scaled by radius)
+   2. Spring attraction along edges
+   3. Gentle gravity toward the center node
+================================================================ */
+function forceLayout(
+  nodes: any[],
+  edges: any[],
+  iterations = 120,
+): any[] {
+  if (nodes.length < 2) return nodes;
+
+  // Work on a mutable copy of positions
+  type Vec = { x: number; y: number };
+  const pos: Record<string, Vec> = {};
+  const radii: Record<string, number> = {};
+  const ids: string[] = [];
+
+  for (const n of nodes) {
+    pos[n.id] = { x: n.position.x, y: n.position.y };
+    radii[n.id] = ((n.data as any)?.radius ?? 40) as number;
+    ids.push(n.id);
+  }
+
+  // Find center node (isCenter) for gravity anchor
+  const centerNode = nodes.find((n: any) => n.data?.walletInfo?.isCenter);
+  const centerId = centerNode?.id ?? ids[0];
+
+  // Build adjacency from edges
+  const adj = new Set<string>();
+  for (const e of edges) {
+    adj.add(`${e.source}|${e.target}`);
+    adj.add(`${e.target}|${e.source}`);
+  }
+
+  const REPULSION = 80_000;      // repulsion strength
+  const SPRING_K_BASE = 0.006;   // base edge spring stiffness
+  const SPRING_LEN_MAX = 450;    // ideal length for weakest edge
+  const SPRING_LEN_MIN = 120;    // ideal length for strongest edge
+  const GRAVITY = 0.002;         // pull toward center
+  const DAMPING = 0.92;          // velocity damping
+  const MIN_DIST = 20;           // avoid division by zero
+  const MAX_FORCE = 60;          // clamp per-axis force
+
+  // Compute max weight across all edges for normalisation
+  let maxWeight = 1;
+  for (const e of edges) {
+    const tx = (e.data?.txCount ?? 1) as number;
+    const vol = (e.data?.volumeTON ?? 0) as number;
+    const w = tx + vol * 0.5;
+    if (w > maxWeight) maxWeight = w;
+  }
+  // Build per-edge weight lookup (source|target -> { springLen, springK })
+  const edgeParams: Record<string, { springLen: number; springK: number }> = {};
+  for (const e of edges) {
+    const tx = (e.data?.txCount ?? 1) as number;
+    const vol = (e.data?.volumeTON ?? 0) as number;
+    const w = tx + vol * 0.5;
+    const ratio = w / maxWeight;  // 0..1 (1 = strongest relationship)
+    const springLen = SPRING_LEN_MAX - ratio * (SPRING_LEN_MAX - SPRING_LEN_MIN);
+    const springK = SPRING_K_BASE * (1 + ratio * 3); // stronger pull for closer wallets
+    const key1 = `${e.source}|${e.target}`;
+    const key2 = `${e.target}|${e.source}`;
+    edgeParams[key1] = { springLen, springK };
+    edgeParams[key2] = { springLen, springK };
+  }
+
+  const vel: Record<string, Vec> = {};
+  for (const id of ids) vel[id] = { x: 0, y: 0 };
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const temp = 1 - iter / iterations; // cooling
+    const forces: Record<string, Vec> = {};
+    for (const id of ids) forces[id] = { x: 0, y: 0 };
+
+    // 1. Repulsion (every pair)
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i], b = ids[j];
+        let dx = pos[a].x - pos[b].x;
+        let dy = pos[a].y - pos[b].y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MIN_DIST) { dx = (Math.random() - 0.5) * 40; dy = (Math.random() - 0.5) * 40; dist = MIN_DIST; }
+
+        // Extra repulsion when circles overlap
+        const overlap = (radii[a] + radii[b] + 30) - dist;
+        const overlapMult = overlap > 0 ? 1 + overlap * 0.05 : 1;
+
+        const f = (REPULSION * overlapMult) / (dist * dist);
+        const fx = (dx / dist) * f;
+        const fy = (dy / dist) * f;
+        forces[a].x += fx; forces[a].y += fy;
+        forces[b].x -= fx; forces[b].y -= fy;
+      }
+    }
+
+    // 2. Edge springs (weighted: closer relationship → shorter spring)
+    for (const e of edges) {
+      const a = e.source as string;
+      const b = e.target as string;
+      if (!pos[a] || !pos[b]) continue;
+      const dx = pos[b].x - pos[a].x;
+      const dy = pos[b].y - pos[a].y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || MIN_DIST;
+      const params = edgeParams[`${a}|${b}`] ?? { springLen: SPRING_LEN_MAX, springK: SPRING_K_BASE };
+      const displacement = dist - params.springLen;
+      const f = params.springK * displacement;
+      const fx = (dx / dist) * f;
+      const fy = (dy / dist) * f;
+      forces[a].x += fx; forces[a].y += fy;
+      forces[b].x -= fx; forces[b].y -= fy;
+    }
+
+    // 3. Gravity toward center node
+    const cx = pos[centerId]?.x ?? 0;
+    const cy = pos[centerId]?.y ?? 0;
+    for (const id of ids) {
+      if (id === centerId) continue;
+      forces[id].x -= (pos[id].x - cx) * GRAVITY;
+      forces[id].y -= (pos[id].y - cy) * GRAVITY;
+    }
+
+    // 4. Apply forces with damping & cooling
+    for (const id of ids) {
+      if (id === centerId) continue; // pin center
+      const fx = Math.max(-MAX_FORCE, Math.min(MAX_FORCE, forces[id].x)) * temp;
+      const fy = Math.max(-MAX_FORCE, Math.min(MAX_FORCE, forces[id].y)) * temp;
+      vel[id].x = (vel[id].x + fx) * DAMPING;
+      vel[id].y = (vel[id].y + fy) * DAMPING;
+      pos[id].x += vel[id].x;
+      pos[id].y += vel[id].y;
+    }
+  }
+
+  // Return nodes with updated positions
+  return nodes.map((n: any) => ({
+    ...n,
+    position: { x: Math.round(pos[n.id].x), y: Math.round(pos[n.id].y) },
+  }));
+}
+
+/* ================================================================
    BUBBLE MAP
 ================================================================ */
 export default function BubbleMap({
@@ -360,6 +504,7 @@ export default function BubbleMap({
         type: 'circle',
         animated: true,
         label,
+        data: { txCount: cp.txCount, volumeTON: nanoToTON(cp.sentNano + cp.receivedNano) },
         style: { stroke: color, strokeWidth: 2.5 },
         markerEnd: {
           type: MarkerType.Arrow,
@@ -624,6 +769,14 @@ export default function BubbleMap({
     );
   }, [selected, setNodes]);
 
+  /* -- Force layout: realign nodes to avoid overlap -- */
+  const handleRealign = useCallback(() => {
+    setNodes((currentNodes: any[]) => {
+      const updated = forceLayout(currentNodes, edges);
+      return updated;
+    });
+  }, [edges, setNodes]);
+
   /* -- Persist state -- */
   useEffect(() => {
     if (nodes.length > 0 && activeAddress) {
@@ -708,6 +861,20 @@ export default function BubbleMap({
         >
           <Background color="#1a2535" gap={26} size={1} />
           <Controls />
+
+          {/* Realign button */}
+          <Panel position="top-left" style={{ marginTop: 8, marginLeft: 8 }}>
+            <button
+              onClick={handleRealign}
+              title="Auto-layout: spread overlapping nodes"
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
+                         bg-blue-600/90 border border-blue-400/50 text-white rounded-lg
+                         hover:bg-blue-500 hover:border-blue-300 transition-all cursor-pointer
+                         backdrop-blur-sm shadow-lg"
+            >
+              &#x2728; Realign
+            </button>
+          </Panel>
         </ReactFlow>
       </main>
 
