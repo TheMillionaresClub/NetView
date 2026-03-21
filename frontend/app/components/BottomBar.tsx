@@ -101,28 +101,28 @@ export default function BottomBar() {
   return (
     <footer style={{ height: "42vh" }} className="fixed bottom-0 left-0 w-full z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42]">
 
-      {/* accent line — cyan for mainnet, yellow for testnet */}
+      {/* accent line */}
       <div style={{ height: 2, background: `linear-gradient(90deg, ${networkColor} 0%, transparent 60%)`, flexShrink: 0 }} />
 
       {/* header strip */}
-      <div className="flex items-center justify-between px-5 py-2.5 border-b border-[#1c2d42] shrink-0">
-        <div className="flex items-center gap-3">
-          {/* wallet avatar */}
-          <div style={{ background: `${networkColor}18`, border: `1.5px solid ${networkColor}`, width: 38, height: 38, borderRadius: 10 }}
-               className="flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-xl" style={{ color: networkColor }}>account_balance_wallet</span>
+      <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-2.5 border-b border-[#1c2d42] shrink-0 gap-2 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
+          {/* wallet avatar — hidden on mobile to save space */}
+          <div style={{ background: `${networkColor}18`, border: `1.5px solid ${networkColor}`, width: 32, height: 32, borderRadius: 8 }}
+               className="hidden sm:flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-lg" style={{ color: networkColor }}>account_balance_wallet</span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-white font-bold text-sm font-headline uppercase tracking-wide">{appName}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <span className="text-white font-bold text-xs sm:text-sm font-headline uppercase tracking-wide truncate">{appName}</span>
               {platform && (
-                <span className="text-[9px] font-mono text-[#4a6080]">· {platform}</span>
+                <span className="hidden sm:inline text-[9px] font-mono text-[#4a6080]">· {platform}</span>
               )}
             </div>
-            <div className="font-mono text-[10px] text-[#4a6080] mt-0.5 select-all">{fmtAddr(address, true)}</div>
+            <div className="font-mono text-[10px] text-[#4a6080] mt-0.5 truncate select-all">{fmtAddr(address, true)}</div>
           </div>
           {networkLabel && (
-            <span className="ml-2 text-[8px] font-bold tracking-widest px-2 py-0.5 border"
+            <span className="text-[8px] font-bold tracking-widest px-1.5 sm:px-2 py-0.5 border shrink-0"
                   style={{ color: networkColor, borderColor: networkColor, background: `${networkColor}18` }}>
               {networkLabel}
             </span>
@@ -133,60 +133,58 @@ export default function BottomBar() {
         <button
           onClick={handleShare}
           disabled={busy}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest text-[#0B0E11] bg-[#00E5FF] hover:brightness-110 active:scale-95 transition-all disabled:opacity-60"
+          className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-4 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest text-[#0B0E11] bg-[#00E5FF] hover:brightness-110 active:scale-95 transition-all disabled:opacity-60 shrink-0"
         >
           <span className="material-symbols-outlined text-sm">
             {busy ? "progress_activity" : done ? "check" : "share"}
           </span>
-          {busy ? "Capturing…" : done ? "Saved!" : "Share View"}
+          <span className="hidden sm:inline">{busy ? "Capturing…" : done ? "Saved!" : "Share View"}</span>
         </button>
       </div>
 
-      {/* body: wallet details */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* body: desktop = 3 cols side-by-side, mobile = scrollable single column */}
+      <div className="flex-1 min-h-0 overflow-y-auto sm:overflow-hidden sm:flex">
 
-        {/* ── COL 1: account info ── */}
-        <div className="flex flex-col justify-center gap-5 px-6 py-4 border-r border-[#1c2d42] w-72 shrink-0">
+        {/* ── COL 1 / ROW 1: account info ── */}
+        <div className="flex flex-col justify-center gap-3 sm:gap-5 px-4 sm:px-6 py-3 sm:py-4 border-b sm:border-b-0 sm:border-r border-[#1c2d42] sm:w-72 sm:shrink-0">
           <div>
-            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-2">Wallet Address</div>
-            <div className="font-mono text-xs text-[#c8d8ec] break-all leading-relaxed select-all">
+            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-1 sm:mb-2">Wallet Address</div>
+            <div className="font-mono text-[11px] sm:text-xs text-[#c8d8ec] break-all leading-relaxed select-all">
               {address}
             </div>
           </div>
           <div>
-            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-2">Raw Address</div>
+            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-1 sm:mb-2">Raw Address</div>
             <div className="font-mono text-[10px] text-[#4a6080] break-all leading-relaxed select-all">
               {rawAddress}
             </div>
           </div>
         </div>
 
-        {/* ── COL 2: wallet app + network ── */}
-        <div className="flex flex-col justify-center gap-5 px-6 py-4 border-r border-[#1c2d42] w-56 shrink-0">
+        {/* ── COL 2 / ROW 2: wallet app + network ── */}
+        <div className="flex flex-row sm:flex-col justify-around sm:justify-center gap-4 sm:gap-5 px-4 sm:px-6 py-3 sm:py-4 border-b sm:border-b-0 sm:border-r border-[#1c2d42] sm:w-56 sm:shrink-0">
           <div>
-            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-2">Wallet App</div>
-            <div className="font-bold text-lg text-[#c8d8ec] font-headline uppercase tracking-wide">{appName}</div>
-            {platform && <div className="text-[10px] text-[#4a6080] mt-1 capitalize">{platform}</div>}
+            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-1 sm:mb-2">Wallet App</div>
+            <div className="font-bold text-base sm:text-lg text-[#c8d8ec] font-headline uppercase tracking-wide">{appName}</div>
+            {platform && <div className="text-[10px] text-[#4a6080] mt-0.5 capitalize">{platform}</div>}
           </div>
           <div>
-            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-2">Network</div>
+            <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase mb-1 sm:mb-2">Network</div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: networkColor }} />
-              <span className="font-mono font-bold text-sm" style={{ color: networkColor }}>
-                {networkLabel}
-              </span>
+              <span className="font-mono font-bold text-sm" style={{ color: networkColor }}>{networkLabel}</span>
             </div>
-            <div className="font-mono text-[9px] text-[#4a6080] mt-1">chain {chain}</div>
+            <div className="font-mono text-[9px] text-[#4a6080] mt-0.5">chain {chain}</div>
           </div>
         </div>
 
-        {/* ── COL 3: activity placeholder ── */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase px-5 pt-4 pb-2 shrink-0">
+        {/* ── COL 3 / ROW 3: activity placeholder ── */}
+        <div className="flex flex-col flex-1 min-w-0 py-3 sm:py-0">
+          <div className="text-[8px] font-bold tracking-[2px] text-[#4a6080] uppercase px-4 sm:px-5 pt-1 sm:pt-4 pb-2 shrink-0">
             On-chain Activity
           </div>
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
-            <span className="material-symbols-outlined text-3xl text-[#1c2d42]">analytics</span>
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 sm:gap-3 text-center px-6 sm:px-8">
+            <span className="material-symbols-outlined text-2xl sm:text-3xl text-[#1c2d42]">analytics</span>
             <p className="font-mono text-[10px] text-[#253548] uppercase tracking-widest leading-relaxed">
               Real-time on-chain data<br />coming soon
             </p>
