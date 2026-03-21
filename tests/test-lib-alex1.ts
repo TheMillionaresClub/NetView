@@ -20,7 +20,7 @@ async function main() {
   bg.__wbg_set_wasm(wasmModule.instance.exports);
 
   // Now call the exported function
-  const address = "0QD6a-uyjiAX8gRmtPi2ztdeBEliw6GrBa6dQBeM8wlQfJ5K";
+  const address = "kQDMo9xJIt6qMhYJg5luhIK18XkRJVKUPeOgrA0ORJoTgewC";
   const info = await bg.get_address_information(address);
 
   // The function returns a string — could be JSON or raw value
