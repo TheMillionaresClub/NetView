@@ -100,7 +100,8 @@ export default function BubbleMap({
   searchTerm: string; 
   setSearchTerm: (val: string) => void; 
 }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [nodes, setNodes, onNodesChange] = useNodesState([] as any[]);
   const [selected, setSelected]          = useState<WalletData | null>(null);
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
 
