@@ -401,3 +401,6 @@ if __name__ == "__main__":
     )
     result = smart_decode(boc)
     print(json.dumps(result, indent=2, default=str))
+    
+    with open("decoded_transaction.json", "w") as f:
+        json.dump(result, f, indent=2, default=str)
