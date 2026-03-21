@@ -14,7 +14,18 @@ router.get("/", async (req, res) => {
 
     try {
         const bg = await getWalletInfoWasm();
-        const profile = await bg.analyze_wallet(address, network, API_KEY ?? null);
+        const raw = await bg.analyze_wallet(address, network, API_KEY ?? null);
+
+        // serde_wasm_bindgen can produce objects with circular refs;
+        // re-serialise safely via structured clone → JSON round-trip
+        let profile: any;
+        try {
+            profile = JSON.parse(JSON.stringify(raw));
+        } catch {
+            // If still circular, try stringifying individual fields
+            profile = raw;
+        }
+
         return res.json({ ok: true, result: profile });
     } catch (err) {
         console.error("wallet-analysis error:", err);
