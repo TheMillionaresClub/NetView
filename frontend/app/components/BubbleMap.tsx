@@ -180,61 +180,83 @@ export default function BubbleMap({
 
   /* ── 1. CHARGEMENT INITIAL (La Galaxy de 30 users) ── */
   useEffect(() => {
-    const savedState = loadSaved();
+    // Check for shared view in URL params first, then fall back to localStorage
+    const loadState = async (): Promise<SavedState | null> => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get("view");
+      if (viewParam) {
+        const shared = await decompressFromUrl(viewParam);
+        if (shared) {
+          // Save shared state to localStorage so it persists
+          saveToStorage([], shared.edges, shared.unlockedWallets);
+          // Clean the URL so the param doesn't stick around
+          window.history.replaceState({}, "", window.location.pathname);
+          return shared;
+        }
+      }
+      return loadSaved();
+    };
 
-    fetch("/data.json")
-      .then((r) => r.json())
-      .then((data: WalletData[]) => {
-        setAllWalletsDb(data);
+    loadState().then((savedState) => {
+      // Update unlocked wallets from loaded state
+      if (savedState?.unlockedWallets && savedState.unlockedWallets.length > 0) {
+        setUnlockedWallets(savedState.unlockedWallets);
+      }
 
-        const mainNode = {
-          id: "me",
-          type: "person",
-          position: savedState?.nodePositions?.["me"] ?? { x: 0, y: 0 },
-          data: {
-            name: userAddress ? "Mon Wallet" : "Non Connecté",
-            volume: 0, 
-            radius: 50,
-            raw: { id: "me", type: "primary", name: "Mon Wallet", totalVolume: 0, totalTransactions: 0, topTokens: [], recentTransactions: [] },
-            selected: false,
-            onSelect: setSelected,
-          },
-        };
+      fetch("/data.json")
+        .then((r) => r.json())
+        .then((data: WalletData[]) => {
+          setAllWalletsDb(data);
 
-        const radiusOrbit = 450;
-        const newNodes = data.map((p, i) => {
-          const r = calcRadius(p.totalVolume);
-          const angle = (i / data.length) * 2 * Math.PI; 
-          const jitter = (Math.random() - 0.5) * 150;
-          
-          // Use saved position if available, otherwise compute fresh
-          const defaultPos = {
-            x: Math.cos(angle) * (radiusOrbit + jitter),
-            y: Math.sin(angle) * (radiusOrbit + jitter),
-          };
-          
-          return {
-            id: p.id,
+          const mainNode = {
+            id: "me",
             type: "person",
-            position: savedState?.nodePositions?.[p.id] ?? defaultPos,
+            position: savedState?.nodePositions?.["me"] ?? { x: 0, y: 0 },
             data: {
-              name: p.name,
-              volume: p.totalVolume,
-              radius: r,
-              raw: p,
+              name: userAddress ? "Mon Wallet" : "Non Connecté",
+              volume: 0, 
+              radius: 50,
+              raw: { id: "me", type: "primary", name: "Mon Wallet", totalVolume: 0, totalTransactions: 0, topTokens: [], recentTransactions: [] },
               selected: false,
               onSelect: setSelected,
             },
           };
+
+          const radiusOrbit = 450;
+          const newNodes = data.map((p, i) => {
+            const r = calcRadius(p.totalVolume);
+            const angle = (i / data.length) * 2 * Math.PI; 
+            const jitter = (Math.random() - 0.5) * 150;
+            
+            // Use saved position if available, otherwise compute fresh
+            const defaultPos = {
+              x: Math.cos(angle) * (radiusOrbit + jitter),
+              y: Math.sin(angle) * (radiusOrbit + jitter),
+            };
+            
+            return {
+              id: p.id,
+              type: "person",
+              position: savedState?.nodePositions?.[p.id] ?? defaultPos,
+              data: {
+                name: p.name,
+                volume: p.totalVolume,
+                radius: r,
+                raw: p,
+                selected: false,
+                onSelect: setSelected,
+              },
+            };
+          });
+
+          setNodes([mainNode, ...newNodes]);
+
+          // Restore saved edges for previously unlocked wallets
+          if (savedState?.edges && savedState.edges.length > 0) {
+            setEdges(savedState.edges);
+          }
         });
-
-        setNodes([mainNode, ...newNodes]);
-
-        // Restore saved edges for previously unlocked wallets
-        if (savedState?.edges && savedState.edges.length > 0) {
-          setEdges(savedState.edges);
-        }
-      });
+    });
   }, [setNodes, setEdges, userAddress]);
 
   /* ── 2. LOGIQUE DU PAIEMENT ── */
