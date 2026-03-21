@@ -1,34 +1,31 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useTonConnectUI } from "@tonconnect/ui-react";
 
 /* ════════════════════════════════════════════════════════
-   TYPES — mock data (still used by BubbleMap nodes)
+   TYPES
 ════════════════════════════════════════════════════════ */
-export interface TopToken {
-  symbol: string;
-  balance: number;
+
+/** Counterparty flow summary passed from BubbleMap */
+export interface CounterpartyFlow {
+  address: string;
+  sentNano: number;
+  receivedNano: number;
+  txCount: number;
+  lastSeen: number;
 }
 
-export interface RecentTransaction {
-  action: string;
-  amount: number;
-  token: string;
-  time: string;
-  with: string;
-}
-
+/** Minimal wallet data passed from the graph node */
 export interface WalletData {
   id: string;
   name: string;
-  type: "primary" | "whale" | "trader" | "degen" | "investor" | string;
+  type: string;
   totalVolume: number;
   totalTransactions: number;
-  topTokens: TopToken[];
-  recentTransactions: RecentTransaction[];
 }
 
-/* ── On-chain types (from /api/wallet-analysis) ─────── */
+/* On-chain types (from /api/wallet-analysis Rust WalletProfile) */
 interface JettonBalance {
   jetton_address: string;
   wallet_address: string;
@@ -48,17 +45,16 @@ interface NftItem {
   verified: boolean;
 }
 
-interface TxSummary {
-  hash: string;
-  lt: string;
-  utime: number;
-  total_fees: string;
-  in_msg_value: string | null;
-  out_msg_count: number;
+interface RustTransaction {
+  address: string;
+  action: string;
+  amount: number;
+  timestamp: number;
+  fee: number;
 }
 
 interface Classification {
-  kind: string; // "HumanWallet" | "BotWallet" | "SmartContract" | "Exchange"
+  kind: string;
   confidence: number;
   signals: string[];
 }
@@ -70,15 +66,16 @@ interface WalletProfile {
   jettons: JettonBalance[];
   nfts: NftItem[];
   dns_names: { name: string; category: string; value: string }[];
-  recent_transactions: TxSummary[];
+  recent_transactions: RustTransaction[];
+  interacted_wallets: Record<string, string>;
   classification: Classification;
 }
 
 interface Props {
   wallet: WalletData | null;
   onClose: () => void;
-  isUnlocked?: boolean;
-  onUnlock?: () => void;
+  flow: CounterpartyFlow | null;
+  centerAddress: string | null;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -88,7 +85,7 @@ function fmtTon(nano: number): string {
   const ton = nano / 1e9;
   if (ton >= 1e6) return (ton / 1e6).toFixed(2) + "M";
   if (ton >= 1e3) return (ton / 1e3).toFixed(1) + "K";
-  if (ton < 0.001) return ton.toFixed(6);
+  if (ton < 0.001 && ton > 0) return ton.toFixed(6);
   return ton.toFixed(3);
 }
 
@@ -106,47 +103,34 @@ function fmtJetton(raw: string, decimals: number | null): string {
   return fmtBalance(v);
 }
 
-function fmtTx(n: number): string {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
-  return n.toString();
-}
-
 function timeAgo(utime: number): string {
   const diff = Math.floor(Date.now() / 1000) - utime;
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function fmtNano(v: string): string {
-  const n = Number(v) / 1e9;
-  if (n === 0) return "0";
-  if (n < 0.001) return n.toFixed(6);
-  return n.toFixed(3);
+  if (diff < 60) return diff + "s ago";
+  if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+  return Math.floor(diff / 86400) + "d ago";
 }
 
 function shortAddr(addr: string | undefined | null): string {
-  if (!addr) return "—";
+  if (!addr) return "\u2014";
   if (addr.length <= 12) return addr;
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
+  return addr.slice(0, 6) + "\u2026" + addr.slice(-4);
 }
 
 const KIND_THEME: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
-  HumanWallet:   { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "HUMAN WALLET",   emoji: "👤" },
-  BotWallet:     { color: "#f59e0b", bg: "rgba(245,158,11,.12)",  label: "BOT WALLET",     emoji: "🤖" },
-  SmartContract: { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "SMART CONTRACT", emoji: "📜" },
-  Exchange:      { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "EXCHANGE",       emoji: "🏛" },
-  Unknown:       { color: "#64748b", bg: "rgba(100,116,139,.12)", label: "UNKNOWN",        emoji: "❓" },
+  HumanWallet:   { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "HUMAN WALLET",   emoji: "\uD83D\uDC64" },
+  BotWallet:     { color: "#f59e0b", bg: "rgba(245,158,11,.12)",  label: "BOT WALLET",     emoji: "\uD83E\uDD16" },
+  SmartContract: { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "SMART CONTRACT", emoji: "\uD83D\uDCDC" },
+  Exchange:      { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "EXCHANGE",       emoji: "\uD83C\uDFDB" },
+  Unknown:       { color: "#64748b", bg: "rgba(100,116,139,.12)", label: "UNKNOWN",        emoji: "\u2753" },
 };
 
 const TYPE_THEME: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
-  primary:  { color: "#fb923c", bg: "rgba(249,115,22,.12)",  label: "PRIMARY",  emoji: "◉" },
-  whale:    { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "WHALE",    emoji: "◎" },
-  trader:   { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "TRADER",   emoji: "⟳" },
-  degen:    { color: "#22c55e", bg: "rgba(34,197,94,.12)",   label: "DEGEN",    emoji: "⚡" },
-  investor: { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "INVESTOR", emoji: "◈" },
+  primary:  { color: "#fb923c", bg: "rgba(249,115,22,.12)",  label: "PRIMARY",  emoji: "\u25C9" },
+  whale:    { color: "#a855f7", bg: "rgba(168,85,247,.12)",  label: "WHALE",    emoji: "\u25CE" },
+  trader:   { color: "#3b82f6", bg: "rgba(59,130,246,.12)",  label: "TRADER",   emoji: "\u27F3" },
+  degen:    { color: "#22c55e", bg: "rgba(34,197,94,.12)",   label: "DEGEN",    emoji: "\u26A1" },
+  investor: { color: "#06b6d4", bg: "rgba(6,182,212,.12)",   label: "INVESTOR", emoji: "\u25C8" },
 };
 
 const TOKEN_COLORS: Record<string, string> = {
@@ -161,24 +145,24 @@ function tokenColor(sym: string): string {
 }
 
 /* ════════════════════════════════════════════════════════
-   COMPOSANT
+   COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function DetailPanel({ wallet, onClose, isUnlocked = false, onUnlock }: Props) {
+export default function DetailPanel({ wallet, onClose, flow, centerAddress }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<WalletProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [tonConnectUI] = useTonConnectUI();
 
-  /* ── Fetch on-chain profile when wallet changes ── */
-  const fetchProfile = useCallback(async (address: string) => {
-    setLoading(true);
-    setError(null);
-    setProfile(null);
+  /* Fetch full on-chain profile (analyze_wallet) */
+  const fetchFullAnalysis = useCallback(async (address: string) => {
+    setLoadingProfile(true);
+    setProfileError(null);
     try {
       const res = await fetch(
-        `http://localhost:3001/api/wallet-analysis?address=${encodeURIComponent(address)}&network=testnet`
+        "http://localhost:3001/api/wallet-analysis?address=" + encodeURIComponent(address) + "&network=testnet"
       );
-      if (!res.ok) throw new Error(`API ${res.status}`);
+      if (!res.ok) throw new Error("API " + res.status);
       const data = await res.json();
       if (data.ok) {
         setProfile(data.result);
@@ -186,19 +170,53 @@ export default function DetailPanel({ wallet, onClose, isUnlocked = false, onUnl
         throw new Error(data.error ?? "Unknown error");
       }
     } catch (err: any) {
-      setError(err.message ?? "Failed to fetch");
+      setProfileError(err.message ?? "Failed to fetch");
     } finally {
-      setLoading(false);
+      setLoadingProfile(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (!wallet || wallet.id === "me") return;
-    if (!isUnlocked) return;
-    fetchProfile(wallet.id);
-  }, [wallet?.id, isUnlocked, fetchProfile]);
+  /* Handle "Full Analysis" button: pay then fetch */
+  const handleFullAnalysis = useCallback(async () => {
+    if (!wallet) return;
+    if (profile && profile.address === wallet.id) return;
 
-  /* ── Click outside / Escape to close ── */
+    try {
+      const response = await fetch("http://localhost:3001/api/premium-content");
+      if (response.status === 402) {
+        const invoice = await response.json();
+        const transaction = {
+          validUntil: Math.floor(Date.now() / 1000) + 60,
+          messages: [{
+            address: invoice.address || "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_",
+            amount: invoice.amount || "10000000",
+            payload: invoice.payload,
+          }],
+        };
+        await tonConnectUI.sendTransaction(transaction);
+      }
+    } catch {
+      try {
+        const tx = {
+          validUntil: Math.floor(Date.now() / 1000) + 60,
+          messages: [{ address: "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_", amount: "10000000" }],
+        };
+        await tonConnectUI.sendTransaction(tx);
+      } catch {
+        return;
+      }
+    }
+
+    await fetchFullAnalysis(wallet.id);
+  }, [wallet, profile, tonConnectUI, fetchFullAnalysis]);
+
+  /* Reset profile when wallet changes */
+  useEffect(() => {
+    setProfile(null);
+    setProfileError(null);
+  }, [wallet?.id]);
+
+  /* Click outside / Escape to close */
   useEffect(() => {
     if (!wallet) return;
     const h = (e: MouseEvent) => {
@@ -219,242 +237,382 @@ export default function DetailPanel({ wallet, onClose, isUnlocked = false, onUnl
   const fallbackTheme = TYPE_THEME[wallet.type] ?? TYPE_THEME.investor;
   const onchainKind = profile?.classification?.kind ?? null;
   const theme = onchainKind ? (KIND_THEME[onchainKind] ?? KIND_THEME.Unknown) : fallbackTheme;
-  const isMe = wallet.id === "me";
-  const locked = !isMe && !isUnlocked;
+  const isCenter = wallet.type === "primary";
 
-  // Derived on-chain values
-  const balanceNano = profile?.state?.balance ?? 0;
-  const status = profile?.state?.status ?? profile?.info?.account_state ?? "—";
-  const txCount = profile?.recent_transactions?.length ?? 0;
+  const balanceNano = profile?.state?.balance ?? null;
+  const status = profile?.state?.status ?? profile?.info?.account_state ?? null;
   const jettons = profile?.jettons ?? [];
   const nfts = profile?.nfts ?? [];
-  const txs = profile?.recent_transactions ?? [];
   const confidence = profile?.classification?.confidence ?? 0;
+
+  const txsWithCenter = profile?.recent_transactions?.filter(
+    (tx) => centerAddress && tx.address.toLowerCase() === centerAddress.toLowerCase()
+  ) ?? [];
+
+  const otherCounterparties = profile ? aggregateCounterparties(profile.recent_transactions, centerAddress) : [];
 
   return (
     <>
       <div className="dp-backdrop" onClick={onClose} />
 
       <div ref={cardRef} className="dp-card">
-
-        {/* accent bar */}
-        <div style={{ height: 3, background: locked ? "#1c2d42" : theme.color, flexShrink: 0 }} />
+        <div style={{ height: 3, background: theme.color, flexShrink: 0 }} />
 
         {/* HEADER */}
         <div className="dp-header">
           <div className="dp-avatar" style={{
-            background: locked ? "rgba(28,45,66,.4)" : theme.bg,
-            border: `1.5px solid ${locked ? "#1c2d42" : theme.color}`,
+            background: theme.bg,
+            border: "1.5px solid " + theme.color,
           }}>
-            <span style={{ color: locked ? "#4a6080" : theme.color, fontSize: 22 }}>
-              {locked ? "🔒" : theme.emoji}
+            <span style={{ color: theme.color, fontSize: 22 }}>
+              {theme.emoji}
             </span>
           </div>
           <div className="dp-header-info">
             <div className="dp-wallet-name">{wallet.name}</div>
             <div className="dp-wallet-id">{wallet.id}</div>
-            {!locked && (
+            {onchainKind ? (
               <span className="dp-badge" style={{ color: theme.color, borderColor: theme.color, background: theme.bg }}>
-                {onchainKind ? theme.label : (TYPE_THEME[wallet.type]?.label ?? "WALLET")}
-                {onchainKind && ` · ${Math.round(confidence * 100)}%`}
+                {theme.label} \u00B7 {Math.round(confidence * 100)}%
+              </span>
+            ) : (
+              <span className="dp-badge" style={{ color: fallbackTheme.color, borderColor: fallbackTheme.color, background: fallbackTheme.bg }}>
+                {fallbackTheme.label}
               </span>
             )}
           </div>
-          <button className="dp-close" onClick={onClose}>✕</button>
+          <button className="dp-close" onClick={onClose}>\u2715</button>
         </div>
 
-        {/* LOCKED BODY */}
-        {locked ? (
-          <div className="dp-locked-body">
-            <div className="dp-lock-icon">🔒</div>
-            <div className="dp-lock-title">PAY TO VIEW</div>
-            <div className="dp-lock-sub">Unlock this wallet&apos;s links and on-chain activity</div>
-            <button className="dp-unlock-btn" onClick={onUnlock}>
-              Unlock · 0.01 TON ↗
-            </button>
-          </div>
-        ) : loading ? (
-          /* LOADING STATE */
-          <div className="dp-locked-body">
-            <div className="dp-spinner" />
-            <div className="dp-lock-title">LOADING ON-CHAIN DATA</div>
-            <div className="dp-lock-sub">Fetching wallet analysis from TON…</div>
-          </div>
-        ) : error ? (
-          /* ERROR STATE */
-          <div className="dp-locked-body">
-            <div className="dp-lock-icon">⚠️</div>
-            <div className="dp-lock-title">ANALYSIS FAILED</div>
-            <div className="dp-lock-sub">{error}</div>
-            <button className="dp-unlock-btn" onClick={() => fetchProfile(wallet.id)}>
-              Retry ↻
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* UNLOCKED BODY — REAL ON-CHAIN DATA */}
-            <div className="dp-body">
+        {/* BODY */}
+        <div className="dp-body">
+          <div className="dp-col">
 
-              {/* left col */}
-              <div className="dp-col">
-                {/* Balance */}
-                <div className="dp-block">
-                  <div className="dp-block-label">TON BALANCE</div>
-                  <div className="dp-big-number" style={{ color: "#0098EA" }}>
-                    {fmtTon(balanceNano)} TON
+            {/* Flow with Center */}
+            {flow && !isCenter && (
+              <div className="dp-block">
+                <div className="dp-block-label">TRANSACTION FLOW WITH YOUR WALLET</div>
+                <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="dp-sub-text">SENT TO THIS WALLET</div>
+                    <div className="dp-flow-value" style={{ color: "#ef4444" }}>
+                      \u2191 {fmtTon(flow.sentNano)} TON
+                    </div>
                   </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="dp-sub-text">RECEIVED FROM THIS WALLET</div>
+                    <div className="dp-flow-value" style={{ color: "#22c55e" }}>
+                      \u2193 {fmtTon(flow.receivedNano)} TON
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="dp-sub-text">TRANSACTIONS</div>
+                    <div className="dp-flow-value" style={{ color: "#c8d8ec" }}>
+                      {flow.txCount}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="dp-sub-text">LAST SEEN</div>
+                    <div className="dp-flow-value" style={{ color: "#c8d8ec" }}>
+                      {timeAgo(flow.lastSeen)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Balance (from full profile) */}
+            {balanceNano !== null && (
+              <div className="dp-block">
+                <div className="dp-block-label">TON BALANCE</div>
+                <div className="dp-big-number" style={{ color: "#0098EA" }}>
+                  {fmtTon(balanceNano)} TON
+                </div>
+                {status && (
                   <div className="dp-sub-text">
                     Status: <span style={{ color: status === "active" ? "#22c55e" : "#f59e0b" }}>{status}</span>
-                    {profile?.state?.wallet_type && ` · ${profile.state.wallet_type}`}
-                  </div>
-                </div>
-
-                {/* Transaction count */}
-                <div className="dp-block">
-                  <div className="dp-block-label">RECENT TRANSACTIONS</div>
-                  <div className="dp-big-number">{fmtTx(txCount)}</div>
-                  <div className="dp-sub-text">last 100 on-chain txns</div>
-                </div>
-
-                {/* Jetton holdings */}
-                <div className="dp-block" style={{ borderBottom: nfts.length > 0 ? undefined : "none" }}>
-                  <div className="dp-block-label">
-                    JETTON HOLDINGS {jettons.length > 0 && `(${jettons.length})`}
-                  </div>
-                  {jettons.length === 0 ? (
-                    <div className="dp-sub-text">No jettons found</div>
-                  ) : (
-                    <div className="dp-token-list">
-                      {jettons.slice(0, 8).map((j, i) => {
-                        const sym = j.symbol ?? "???";
-                        const col = tokenColor(sym);
-                        const bal = fmtJetton(j.balance, j.decimals);
-                        return (
-                          <div key={j.jetton_address} className="dp-token-row">
-                            <div className="dp-token-rank" style={{ color: i === 0 ? "#ffd740" : "#4a6080" }}>
-                              #{i + 1}
-                            </div>
-                            {j.image ? (
-                              <img src={j.image} alt={sym} className="dp-token-img" />
-                            ) : (
-                              <div className="dp-token-icon" style={{ background: col + "22", color: col }}>
-                                {sym[0]}
-                              </div>
-                            )}
-                            <div className="dp-token-info">
-                              <div className="dp-token-sym">{sym}</div>
-                              <div className="dp-token-name">{j.name ?? shortAddr(j.jetton_address)}</div>
-                            </div>
-                            <div className="dp-token-balance">{bal}</div>
-                          </div>
-                        );
-                      })}
-                      {jettons.length > 8 && (
-                        <div className="dp-sub-text" style={{ textAlign: "center", paddingTop: 4 }}>
-                          +{jettons.length - 8} more
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* NFTs */}
-                {nfts.length > 0 && (
-                  <div className="dp-block" style={{ borderBottom: "none" }}>
-                    <div className="dp-block-label">NFTS ({nfts.length})</div>
-                    <div className="dp-nft-grid">
-                      {nfts.slice(0, 6).map((n) => (
-                        <div key={n.address} className="dp-nft-item" title={n.name ?? n.address}>
-                          {n.image ? (
-                            <img src={n.image} alt={n.name ?? ""} className="dp-nft-img" />
-                          ) : (
-                            <div className="dp-nft-placeholder">NFT</div>
-                          )}
-                          <div className="dp-nft-name">{n.name ?? shortAddr(n.address)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Classification signals */}
-                {profile?.classification?.signals && profile.classification.signals.length > 0 && (
-                  <div className="dp-block" style={{ borderBottom: "none" }}>
-                    <div className="dp-block-label">CLASSIFICATION SIGNALS</div>
-                    {profile.classification.signals.map((s, i) => (
-                      <div key={i} className="dp-signal">• {s}</div>
-                    ))}
+                    {profile?.state?.wallet_type && (" \u00B7 " + profile.state.wallet_type)}
                   </div>
                 )}
               </div>
+            )}
 
-              <div className="dp-col-sep" />
+            {/* Full Analysis Button (if not yet loaded) */}
+            {!profile && !loadingProfile && (
+              <div className="dp-block" style={{ textAlign: "center", padding: "20px 16px" }}>
+                <div className="dp-block-label" style={{ marginBottom: 12 }}>FULL ON-CHAIN ANALYSIS</div>
+                <div className="dp-sub-text" style={{ marginBottom: 16 }}>
+                  Get complete wallet profile: balance, jettons, NFTs, classification, and all transactions
+                </div>
+                <button className="dp-unlock-btn" onClick={handleFullAnalysis}>
+                  Full Analysis \u00B7 0.01 TON \u2197
+                </button>
+              </div>
+            )}
 
-              {/* right col — real transactions */}
-              <div className="dp-col dp-col-right">
+            {/* Loading state */}
+            {loadingProfile && (
+              <div className="dp-block" style={{ textAlign: "center", padding: "20px 16px" }}>
+                <div className="dp-spinner" style={{ margin: "0 auto 12px" }} />
+                <div className="dp-block-label">ANALYZING WALLET</div>
+                <div className="dp-sub-text">Fetching balance, jettons, NFTs, transactions\u2026</div>
+              </div>
+            )}
+
+            {/* Error state */}
+            {profileError && (
+              <div className="dp-block" style={{ textAlign: "center", padding: "20px 16px" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>\u26A0\uFE0F</div>
+                <div className="dp-block-label">ANALYSIS FAILED</div>
+                <div className="dp-sub-text" style={{ marginBottom: 12 }}>{profileError}</div>
+                <button className="dp-unlock-btn" onClick={() => fetchFullAnalysis(wallet.id)}>
+                  Retry \u21BB
+                </button>
+              </div>
+            )}
+
+            {/* Jettons */}
+            {profile && jettons.length > 0 && (
+              <div className="dp-block">
+                <div className="dp-block-label">
+                  JETTON HOLDINGS ({jettons.length})
+                </div>
+                <div className="dp-token-list">
+                  {jettons.slice(0, 8).map((j, i) => {
+                    const sym = j.symbol ?? "???";
+                    const col = tokenColor(sym);
+                    const bal = fmtJetton(j.balance, j.decimals);
+                    return (
+                      <div key={j.jetton_address} className="dp-token-row">
+                        <div className="dp-token-rank" style={{ color: i === 0 ? "#ffd740" : "#4a6080" }}>
+                          #{i + 1}
+                        </div>
+                        {j.image ? (
+                          <img src={j.image} alt={sym} className="dp-token-img" />
+                        ) : (
+                          <div className="dp-token-icon" style={{ background: col + "22", color: col }}>
+                            {sym[0]}
+                          </div>
+                        )}
+                        <div className="dp-token-info">
+                          <div className="dp-token-sym">{sym}</div>
+                          <div className="dp-token-name">{j.name ?? shortAddr(j.jetton_address)}</div>
+                        </div>
+                        <div className="dp-token-balance">{bal}</div>
+                      </div>
+                    );
+                  })}
+                  {jettons.length > 8 && (
+                    <div className="dp-sub-text" style={{ textAlign: "center", paddingTop: 4 }}>
+                      +{jettons.length - 8} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* NFTs */}
+            {profile && nfts.length > 0 && (
+              <div className="dp-block">
+                <div className="dp-block-label">NFTS ({nfts.length})</div>
+                <div className="dp-nft-grid">
+                  {nfts.slice(0, 6).map((n) => (
+                    <div key={n.address} className="dp-nft-item" title={n.name ?? n.address}>
+                      {n.image ? (
+                        <img src={n.image} alt={n.name ?? ""} className="dp-nft-img" />
+                      ) : (
+                        <div className="dp-nft-placeholder">NFT</div>
+                      )}
+                      <div className="dp-nft-name">{n.name ?? shortAddr(n.address)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Classification signals */}
+            {profile?.classification?.signals && profile.classification.signals.length > 0 && (
+              <div className="dp-block" style={{ borderBottom: "none" }}>
+                <div className="dp-block-label">CLASSIFICATION SIGNALS</div>
+                {profile.classification.signals.map((s, i) => (
+                  <div key={i} className="dp-signal">{"\u2022"} {s}</div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="dp-col-sep" />
+
+          {/* RIGHT COL: Transaction Activity */}
+          <div className="dp-col dp-col-right">
+
+            {/* Transactions with center wallet */}
+            {profile && txsWithCenter.length > 0 && (
+              <>
                 <div className="dp-block-label" style={{ padding: "14px 16px 8px" }}>
-                  ON-CHAIN ACTIVITY
+                  TRANSACTIONS WITH YOUR WALLET ({txsWithCenter.length})
                 </div>
                 <div className="dp-tx-list">
-                  {txs.length === 0 ? (
-                    <div className="dp-sub-text" style={{ padding: "16px", textAlign: "center" }}>
-                      No transactions found
-                    </div>
-                  ) : txs.map((tx, i) => {
-                    const hasInbound = tx.in_msg_value && tx.in_msg_value !== "0";
-                    const isOutbound = tx.out_msg_count > 0;
-                    const direction = hasInbound && !isOutbound ? "IN" : isOutbound ? "OUT" : "INTERNAL";
-                    const col = direction === "IN" ? "#00e676" : direction === "OUT" ? "#ff1744" : "#00e5ff";
-                    const arrow = direction === "IN" ? "↙" : direction === "OUT" ? "↗" : "↔";
-                    const bg = direction === "IN" ? "rgba(0,230,118,.12)" : direction === "OUT" ? "rgba(255,23,68,.12)" : "rgba(0,229,255,.1)";
-                    const value = hasInbound ? fmtNano(tx.in_msg_value!) : "—";
-                    const fee = fmtNano(tx.total_fees);
-
+                  {txsWithCenter.map((tx, i) => {
+                    const isSend = tx.action === "Send";
+                    const col = isSend ? "#ef4444" : "#22c55e";
+                    const arrow = isSend ? "\u2197" : "\u2199";
+                    const bg = isSend ? "rgba(255,23,68,.12)" : "rgba(0,230,118,.12)";
                     return (
-                      <div key={tx.hash} className="dp-tx-row">
+                      <div key={"center-tx-" + i} className="dp-tx-row">
                         <div className="dp-tx-arrow" style={{ background: bg, color: col }}>{arrow}</div>
                         <div className="dp-tx-detail">
-                          <div className="dp-tx-action" style={{ color: col }}>{direction}</div>
-                          <div className="dp-tx-token">{shortAddr(tx.hash)}</div>
+                          <div className="dp-tx-action" style={{ color: col }}>
+                            {isSend ? "SENT" : "RECEIVED"}
+                          </div>
+                          <div className="dp-tx-token">
+                            {isSend ? "\u2192" : "\u2190"} Your Wallet
+                          </div>
                         </div>
                         <div className="dp-tx-right">
-                          <div className="dp-tx-amount">
-                            {value !== "—" ? `${value} TON` : `${tx.out_msg_count} msg${tx.out_msg_count > 1 ? "s" : ""}`}
-                          </div>
-                          <div className="dp-tx-usd">fee: {fee} TON</div>
-                          <div className="dp-tx-time">{timeAgo(tx.utime)}</div>
+                          <div className="dp-tx-amount">{fmtTon(tx.amount)} TON</div>
+                          <div className="dp-tx-usd">fee: {fmtTon(tx.fee)} TON</div>
+                          <div className="dp-tx-time">{timeAgo(tx.timestamp)}</div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
-            {/* FOOTER */}
-            <div className="dp-footer">
-              <span className="dp-footer-meta">
-                {txCount} txns · {jettons.length} jettons · {nfts.length} NFTs
-              </span>
-              <button
-                className="dp-explorer-btn"
-                onClick={() => {
-                  const tg = (window as any).Telegram?.WebApp;
-                  const url = `https://testnet.tonscan.org/address/${wallet.id}`;
-                  if (tg) tg.openLink?.(url);
-                  else window.open(url, "_blank");
-                }}
-              >
-                VIEW ON EXPLORER ↗
-              </button>
-            </div>
-          </>
-        )}
+            {/* Other aggregated counterparties */}
+            {profile && otherCounterparties.length > 0 && (
+              <>
+                <div className="dp-block-label" style={{ padding: "14px 16px 8px" }}>
+                  OTHER COUNTERPARTIES ({otherCounterparties.length})
+                </div>
+                <div className="dp-tx-list">
+                  {otherCounterparties.slice(0, 20).map((cp) => {
+                    const net = cp.totalReceived - cp.totalSent;
+                    const col = net > 0 ? "#22c55e" : net < 0 ? "#ef4444" : "#c8d8ec";
+                    const arrow = net > 0 ? "\u2199" : net < 0 ? "\u2197" : "\u2194";
+                    const bg = net > 0 ? "rgba(0,230,118,.12)" : net < 0 ? "rgba(255,23,68,.12)" : "rgba(0,229,255,.1)";
+                    const balStr = profile.interacted_wallets?.[cp.address];
+                    return (
+                      <div key={cp.address} className="dp-tx-row">
+                        <div className="dp-tx-arrow" style={{ background: bg, color: col }}>{arrow}</div>
+                        <div className="dp-tx-detail">
+                          <div className="dp-tx-action" style={{ color: "#c8d8ec", fontSize: 10 }}>
+                            {shortAddr(cp.address)}
+                          </div>
+                          <div className="dp-tx-token">
+                            {cp.txCount} tx{cp.txCount !== 1 ? "s" : ""}
+                            {balStr ? (" \u00B7 bal: " + fmtTon(Number(balStr)) + " TON") : ""}
+                          </div>
+                        </div>
+                        <div className="dp-tx-right">
+                          <div className="dp-tx-amount" style={{ color: col }}>
+                            {net > 0 ? "+" : ""}{fmtTon(net)} TON
+                          </div>
+                          <div className="dp-tx-usd">
+                            \u2191{fmtTon(cp.totalSent)} \u2193{fmtTon(cp.totalReceived)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* If no profile yet, show the flow summary */}
+            {!profile && flow && (
+              <>
+                <div className="dp-block-label" style={{ padding: "14px 16px 8px" }}>
+                  ON-CHAIN ACTIVITY
+                </div>
+                <div style={{ padding: "16px", textAlign: "center" }}>
+                  <div className="dp-sub-text" style={{ marginBottom: 12 }}>
+                    {flow.txCount} transaction{flow.txCount !== 1 ? "s" : ""} with your wallet
+                  </div>
+                  <div className="dp-sub-text">
+                    Use &quot;Full Analysis&quot; to see all transactions, jettons, NFTs and classification
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!profile && !flow && (
+              <div style={{ padding: "24px 16px", textAlign: "center" }}>
+                <div className="dp-sub-text">
+                  This is your connected wallet
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="dp-footer">
+          <span className="dp-footer-meta">
+            {profile
+              ? (profile.recent_transactions.length + " txns \u00B7 " + jettons.length + " jettons \u00B7 " + nfts.length + " NFTs")
+              : flow
+                ? (flow.txCount + " txns with center")
+                : "connected wallet"
+            }
+          </span>
+          <button
+            className="dp-explorer-btn"
+            onClick={() => {
+              const tg = (window as any).Telegram?.WebApp;
+              const url = "https://testnet.tonscan.org/address/" + wallet.id;
+              if (tg) tg.openLink?.(url);
+              else window.open(url, "_blank");
+            }}
+          >
+            VIEW ON EXPLORER \u2197
+          </button>
+        </div>
       </div>
 
       <style>{CSS}</style>
     </>
   );
+}
+
+/* ════════════════════════════════════════════════════════
+   HELPER: Aggregate transactions by counterparty
+   Each address appears once with total sent/received/txCount
+════════════════════════════════════════════════════════ */
+interface AggregatedCounterparty {
+  address: string;
+  totalSent: number;
+  totalReceived: number;
+  txCount: number;
+}
+
+function aggregateCounterparties(
+  txs: RustTransaction[],
+  excludeAddress: string | null,
+): AggregatedCounterparty[] {
+  const map = new Map<string, AggregatedCounterparty>();
+
+  for (const tx of txs) {
+    if (excludeAddress && tx.address.toLowerCase() === excludeAddress.toLowerCase()) continue;
+
+    if (!map.has(tx.address)) {
+      map.set(tx.address, { address: tx.address, totalSent: 0, totalReceived: 0, txCount: 0 });
+    }
+    const entry = map.get(tx.address)!;
+    entry.txCount++;
+    if (tx.action === "Send") {
+      entry.totalSent += tx.amount;
+    } else {
+      entry.totalReceived += tx.amount;
+    }
+  }
+
+  return Array.from(map.values())
+    .sort((a, b) => (b.totalSent + b.totalReceived) - (a.totalSent + a.totalReceived));
 }
 
 /* ════════════════════════════════════════════════════════
@@ -480,7 +638,7 @@ const CSS = `
   position: fixed;
   bottom: 62px; left: 50%;
   transform: translateX(-50%);
-  width: min(720px, calc(100vw - 20px));
+  width: min(760px, calc(100vw - 20px));
   max-height: calc(100vh - 110px);
   background: #0b1421;
   border: 1px solid #1c2d42;
@@ -526,46 +684,6 @@ const CSS = `
 }
 .dp-close:hover { color: #fff; }
 
-/* locked/loading state */
-.dp-locked-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px 24px;
-}
-.dp-lock-icon  { font-size: 36px; opacity: .4; }
-.dp-lock-title {
-  font-size: 16px; font-weight: 700; letter-spacing: 3px;
-  color: #4a6080; text-transform: uppercase;
-}
-.dp-lock-sub {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px; color: #253548; text-align: center;
-}
-.dp-unlock-btn {
-  margin-top: 8px;
-  background: #00e5ff; color: #0b0e11;
-  border: none; cursor: pointer;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px; font-weight: 700; letter-spacing: 1px;
-  padding: 9px 22px; border-radius: 4px;
-  transition: filter .15s, transform .1s;
-}
-.dp-unlock-btn:hover  { filter: brightness(1.1); }
-.dp-unlock-btn:active { transform: scale(.97); }
-
-.dp-spinner {
-  width: 36px; height: 36px;
-  border: 3px solid #1c2d42;
-  border-top-color: #00e5ff;
-  border-radius: 50%;
-  animation: dp-spin .8s linear infinite;
-}
-
-/* body — 2 colonnes */
 .dp-body {
   display: flex;
   flex: 1;
@@ -605,6 +723,31 @@ const CSS = `
 }
 .dp-sub-text { font-size: 10px; color: #4a6080; margin-top: 4px; }
 
+.dp-flow-value {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px; font-weight: 700;
+  margin-top: 4px;
+}
+
+.dp-unlock-btn {
+  background: #00e5ff; color: #0b0e11;
+  border: none; cursor: pointer;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  padding: 9px 22px; border-radius: 4px;
+  transition: filter .15s, transform .1s;
+}
+.dp-unlock-btn:hover  { filter: brightness(1.1); }
+.dp-unlock-btn:active { transform: scale(.97); }
+
+.dp-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid #1c2d42;
+  border-top-color: #00e5ff;
+  border-radius: 50%;
+  animation: dp-spin .8s linear infinite;
+}
+
 .dp-token-list { display: flex; flex-direction: column; gap: 10px; }
 .dp-token-row  { display: flex; align-items: center; gap: 8px; }
 .dp-token-rank {
@@ -623,16 +766,11 @@ const CSS = `
 .dp-token-info { flex: 1; min-width: 0; }
 .dp-token-sym  { font-size: 11px; font-weight: 700; color: #c8d8ec; }
 .dp-token-name { font-size: 9px; color: #4a6080; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dp-token-bar-wrap { display: flex; align-items: center; gap: 6px; }
-.dp-token-bar-bg   { flex: 1; height: 4px; background: #1c2d42; border-radius: 2px; }
-.dp-token-bar-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
-.dp-token-pct  { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: #4a6080; flex-shrink: 0; }
 .dp-token-balance {
   font-family: 'Share Tech Mono', monospace;
   font-size: 10px; color: #7a9ab8; text-align: right; flex-shrink: 0;
 }
 
-/* NFT grid */
 .dp-nft-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
 }
@@ -653,7 +791,6 @@ const CSS = `
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
 }
 
-/* Classification signals */
 .dp-signal {
   font-family: 'Share Tech Mono', monospace;
   font-size: 9px; color: #4a6080; margin-bottom: 4px; line-height: 1.4;
