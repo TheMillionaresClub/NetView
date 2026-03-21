@@ -5,6 +5,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  Panel,
   useNodesState,
   useEdgesState,
   Handle,
@@ -837,7 +838,7 @@ export default function BubbleMap({
 
           {/* Realign button */}
           {nodes.length > 1 && (
-            <div className="absolute bottom-3 left-14 z-10">
+            <Panel position="bottom-left" style={{ marginBottom: 8, marginLeft: 8 }}>
               <button
                 onClick={handleRealign}
                 title="Auto-layout: spread overlapping nodes"
@@ -849,7 +850,7 @@ export default function BubbleMap({
                 <span className="material-symbols-outlined text-sm">auto_fix_high</span>
                 Realign
               </button>
-            </div>
+            </Panel>
           )}
         </ReactFlow>
       </main>
