@@ -2,7 +2,9 @@
 
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 
-const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/tonconnect-manifest.json`;
+const manifestUrl =
+  process.env.NEXT_PUBLIC_TONCONNECT_MANIFEST_URL ??
+  `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/tonconnect-manifest.json`;
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
