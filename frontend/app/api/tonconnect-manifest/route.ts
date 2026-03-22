@@ -20,7 +20,19 @@ export function GET(req: NextRequest) {
   return NextResponse.json(manifest, {
     headers: {
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
       "Cache-Control": "no-store",
+    },
+  });
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
     },
   });
 }
