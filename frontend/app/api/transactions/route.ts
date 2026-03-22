@@ -3,7 +3,7 @@ import { x402Fetch } from "@ton-x402/client";
 import { TonClient, WalletContractV5R1 } from "@ton/ton";
 import { mnemonicToPrivateKey } from "@ton/crypto";
 
-const EXPRESS_API = process.env.EXPRESS_API_URL ?? "http://localhost:3001";
+const EXPRESS_API = process.env.EXPRESS_API_URL ?? "https://ayesha-acrotic-gingerly.ngrok-free.dev";
 const RPC_URL = process.env.TON_RPC_URL ?? "https://testnet.toncenter.com/api/v2/jsonRPC";
 const RPC_KEY = process.env.RPC_API_KEY ?? undefined;
 const MNEMONIC = process.env.WALLET_MNEMONIC ?? "";
