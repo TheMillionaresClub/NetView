@@ -23,7 +23,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <TonConnectUIProvider
       manifestUrl={manifestUrl}
       key={manifestUrl}
-      actionsConfiguration={{ skipRedirectUrl: true } as any}
     >
       {children}
     </TonConnectUIProvider>
