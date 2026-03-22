@@ -98,6 +98,7 @@ type NodeData = {
   walletInfo: WalletInfo;
   classification: string;
   selected: boolean;
+  isExpanded: boolean;
   onSelect: (w: WalletInfo) => void;
 };
 
