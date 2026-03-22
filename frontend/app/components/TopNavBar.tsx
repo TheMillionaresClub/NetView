@@ -6,10 +6,12 @@ import { useTonWallet, useIsConnectionRestored } from "@tonconnect/ui-react";
 
 export default function TopNavBar({
   searchTerm,
-  setSearchTerm
+  setSearchTerm,
+  onMenuToggle,
 }: {
   searchTerm?: string;
   setSearchTerm?: (val: string) => void;
+  onMenuToggle?: () => void;
 }) {
   const restored = useIsConnectionRestored();
   const wallet   = useTonWallet();
@@ -17,10 +19,20 @@ export default function TopNavBar({
   const isTestnet = chain === "-3";
 
   return (
-    <header className="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-14 bg-[#111417] border-none">
-      <div className="flex items-center gap-3">
+    <header className="fixed top-0 w-full z-50 flex justify-between items-center px-3 sm:px-4 h-14 bg-[#111417] border-none">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Hamburger menu - mobile only */}
+        {onMenuToggle && (
+          <button
+            onClick={onMenuToggle}
+            className="sm:hidden flex items-center justify-center w-9 h-9 text-[#4a6080] hover:text-white transition-colors"
+            aria-label="Toggle navigation"
+          >
+            <span className="material-symbols-outlined text-xl">menu</span>
+          </button>
+        )}
         <Image src="/image.png" alt="NetView" width={28} height={28} className="object-contain" />
-        <span className="text-xl font-bold text-[#00E5FF] font-headline uppercase tracking-tighter">
+        <span className="text-lg sm:text-xl font-bold text-[#00E5FF] font-headline uppercase tracking-tighter">
           NetView
         </span>
         {/* network badge — only shown when connected */}

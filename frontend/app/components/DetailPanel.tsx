@@ -237,6 +237,10 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
       <div className="dp-backdrop" onClick={onClose} />
 
       <div ref={cardRef} className="dp-card">
+        {/* Mobile drag handle */}
+        <div className="dp-drag-handle sm:hidden" onClick={onClose}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#3b4a5c', margin: '0 auto' }} />
+        </div>
         <div style={{ height: 3, background: theme.color, flexShrink: 0 }} />
 
         {/* HEADER */}
@@ -668,6 +672,16 @@ const CSS = `
   z-index: 200;
 }
 
+.dp-drag-handle {
+  display: none;
+  padding: 8px 0 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+@media (max-width: 639px) {
+  .dp-drag-handle { display: block; }
+}
+
 .dp-card {
   position: fixed;
   bottom: 62px; left: 50%;
@@ -689,13 +703,18 @@ const CSS = `
     bottom: 0; left: 0; right: 0;
     transform: none;
     width: 100%;
-    max-height: 85vh;
+    max-height: 90vh;
     border-radius: 14px 14px 0 0;
     animation: dp-in-mobile .25s cubic-bezier(.4,0,.2,1) both;
     overflow: hidden;
     display: flex;
     flex-direction: column;
   }
+  .dp-header { padding: 10px 14px 10px; }
+  .dp-avatar  { width: 38px; height: 38px; }
+  .dp-close   { font-size: 22px; padding: 4px 8px; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+  .dp-unlock-btn { padding: 12px 22px; font-size: 12px; min-height: 44px; }
+  .dp-block { padding: 12px 14px; }
 }
 
 .dp-header {

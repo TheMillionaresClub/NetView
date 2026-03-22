@@ -940,7 +940,7 @@ export default function BubbleMap({
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40" onClick={() => setHistoryOpen(false)} />
           {/* Panel */}
-          <div className="relative ml-auto w-80 h-full bg-[#0a1018] border-l border-slate-700 overflow-y-auto shadow-2xl">
+          <div className="relative ml-auto w-full sm:w-80 h-full bg-[#0a1018] border-l border-slate-700 overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-[#0a1018] border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold uppercase tracking-widest text-slate-300">Tracking History</h2>
               <button
@@ -983,7 +983,7 @@ export default function BubbleMap({
                           {dateStr}
                         </span>
                       </div>
-                      <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => loadFromHistory(entry.address)}
                           title="Load as center wallet"
@@ -1012,7 +1012,7 @@ export default function BubbleMap({
         </div>
       )}
 
-      <main className="fixed left-0 sm:left-20 right-0 top-24 bottom-0 overflow-hidden"
+      <main className="fixed left-0 sm:left-20 right-0 top-[6.5rem] sm:top-24 bottom-0 overflow-hidden"
             style={{ background: "#080d14" }}>
 
         {loading && (
@@ -1031,7 +1031,7 @@ export default function BubbleMap({
         )}
 
         {searchTerm.length > 0 && (
-          <div className="fixed top-28 right-20 z-50 w-72 bg-[#1a2535]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+          <div className="fixed top-28 left-2 right-2 sm:left-auto sm:right-20 z-50 sm:w-72 bg-[#1a2535]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
             {searchResults.length > 0 ? (
               searchResults.map((wallet) => {
                 const isExpanded = expandedAddresses.includes(wallet.id);
@@ -1091,26 +1091,26 @@ export default function BubbleMap({
 
           {/* Realign + History buttons */}
           <Panel position="top-left" style={{ marginTop: 8, marginLeft: 8 }}>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <button
                 onClick={handleRealign}
                 title="Auto-layout: spread overlapping nodes"
-                className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
+                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wide
                            bg-blue-600/90 border border-blue-400/50 text-white rounded-lg
                            hover:bg-blue-500 hover:border-blue-300 transition-all cursor-pointer
                            backdrop-blur-sm shadow-lg"
               >
-                &#x2728; Realign
+                <span className="hidden sm:inline">&#x2728;</span> Realign
               </button>
               <button
                 onClick={() => setHistoryOpen(true)}
                 title="View tracking history"
-                className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
+                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wide
                            bg-slate-700/90 border border-slate-500/50 text-slate-200 rounded-lg
                            hover:bg-slate-600 hover:border-slate-400 transition-all cursor-pointer
                            backdrop-blur-sm shadow-lg"
               >
-                &#x1F4CB; History{history.length > 0 ? ` (${history.length})` : ""}
+                <span className="hidden sm:inline">&#x1F4CB;</span> History{history.length > 0 ? ` (${history.length})` : ""}
               </button>
             </div>
           </Panel>
@@ -1121,17 +1121,17 @@ export default function BubbleMap({
               {/* Filter toggle button */}
               <button
                 onClick={() => setFilterOpen(o => !o)}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide rounded-lg
+                className={`flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-lg
                            transition-all cursor-pointer backdrop-blur-sm shadow-lg border
                            ${(focusWallet || hasClassFilter)
                              ? "bg-orange-600/90 border-orange-400/50 text-white"
                              : "bg-slate-700/90 border-slate-500/50 text-slate-200 hover:bg-slate-600"}`}
               >
-                &#x1F50D; Filter {(focusWallet || hasClassFilter) ? "(active)" : ""}
+                <span className="hidden sm:inline">&#x1F50D;</span> Filter {(focusWallet || hasClassFilter) ? "(active)" : ""}
               </button>
 
               {filterOpen && (
-                <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl p-3 w-64 text-white">
+                <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl p-3 w-[calc(100vw-24px)] sm:w-64 max-w-[280px] text-white">
                   {/* Focus wallet dropdown */}
                   <div className="mb-3">
                     <label className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1 font-bold">
