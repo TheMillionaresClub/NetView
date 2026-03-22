@@ -18,6 +18,7 @@ const { default: walletNetworkRouter } = await import("./routes/wallet-network.j
 const { default: normalizeAddressRouter } = await import("./routes/normalize-address.js");
 const { default: walletConnectionRouter } = await import("./routes/wallet-connection.js");
 const { default: walletScraperRouter } = await import("./routes/wallet-scraper.js");
+const { default: tonStatsRouter } = await import("./routes/ton-stats.js");
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -44,9 +45,11 @@ app.use("/api/wallet-network", walletNetworkRouter);
 app.use("/api/normalize-address", normalizeAddressRouter);
 app.use("/api/wallet-connection", walletConnectionRouter);
 app.use("/api/wallet-scraper", walletScraperRouter);
+app.use("/api/ton-stats", tonStatsRouter);
 
 app.listen(PORT, () => {
     console.log(`Express API server running on http://localhost:${PORT}`);
 });
 
 export default app;
+

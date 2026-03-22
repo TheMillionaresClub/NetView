@@ -44,7 +44,29 @@
       "Bash(ls \"C:\\\\Users\\\\ayfmp\\\\Documents\\\\projects\\\\hackathon\\\\bsa-ton\\\\NetView\\\\rust\\\\wallet-info\\\\src\"\" && ls \"C:UsersayfmpDocumentsprojectshackathonbsa-tonNetViewrustwallet-connectionsrc\"\")",
       "Bash(cargo run:*)",
       "Bash(npm run:*)",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "Bash(xargs wc:*)",
+      "Bash(cargo install:*)",
+      "Bash(TONAPI_KEY=AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI cargo run --features cli)",
+      "Bash(curl -s -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\" \"https://tonapi.io/v2/blockchain/masterchain-head\")",
+      "Bash(curl -s \"https://api.ston.fi/v1/stats/dex\")",
+      "Bash(curl -s \"https://api.ston.fi/v1/pools?limit=2\")",
+      "Bash(curl -s \"https://api.dedust.io/v2/pools?limit=2\")",
+      "Bash(curl -s -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\" \"https://tonapi.io/v2/blockchain/reduced-blocks?workchain=-1&limit=3\")",
+      "Bash(curl -s -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\" \"https://tonapi.io/v2/blockchain/validators\")",
+      "Bash(curl -s -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\" \"https://tonapi.io/v2/blockchain/masterchain/58575453/transactions?limit=3\")",
+      "Bash(curl -s \"https://api.ston.fi/v1/assets?limit=2\")",
+      "Bash(curl -s \"https://api.dedust.io/v2/jettons?limit=2\")",
+      "Bash(curl -s \"https://api.dedust.io/v2/pools?page=0&limit=2\")",
+      "Bash(curl -s http://localhost:3001/api/ton-stats/version)",
+      "Bash(npx tsx -e \":*)",
+      "Bash(timeout 10 npx tsx -e \":*)",
+      "Bash(npx tsx:*)",
+      "Bash(curl -s http://localhost:3001/)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(tasklist)",
+      "Bash(wmic process:*)",
+      "Bash(taskkill //PID 17120 //F)"
     ]
   }
 }

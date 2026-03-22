@@ -48,6 +48,9 @@ importers:
       express:
         specifier: ^4.21.0
         version: 4.22.1
+      ton-stats:
+        specifier: workspace:*
+        version: link:../packages/ton-stats
       wallet-info:
         specifier: workspace:*
         version: link:../packages/wallet-info
@@ -244,6 +247,8 @@ importers:
       '@ton-x402/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/ton-stats: {}
 
   packages/wallet-connection: {}
 
