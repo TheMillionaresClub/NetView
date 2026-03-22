@@ -473,9 +473,6 @@ export default function BubbleMap({
   const [centerAddr, setCenterAddr] = useState<string>("");
   const [profileCache, setProfileCache] = useState<Map<string, WalletProfile>>(new Map());
 
-  // Dismiss the "connect wallet" overlay once the user taps the button
-  const [connectPopupDismissed, setConnectPopupDismissed] = useState(false);
-
   // Payment-related state
   const [paidWallets, setPaidWallets] = useState<Set<string>>(() => loadPaidWallets());
   const paidWalletsRef = useRef<Set<string>>(new Set());
@@ -1542,7 +1539,7 @@ const searchResults = knownWallets.filter((w) =>
       />
 
       {/* Connect Wallet popup — rendered OUTSIDE <main> so ReactFlow can't capture touches */}
-      {!userAddress && !manualAddress && !loading && !connectPopupDismissed && (
+      {!userAddress && !manualAddress && !loading && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
           <div
             className="pointer-events-auto bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center"
@@ -1559,7 +1556,6 @@ const searchResults = knownWallets.filter((w) =>
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                setConnectPopupDismissed(true);
                 try { tonConnectUI.openModal(); } catch (err) { console.error("openModal failed:", err); }
               }}
               className="w-full bg-[#00E5FF] text-[#0B0E11] px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-lg
