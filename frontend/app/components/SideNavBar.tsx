@@ -67,26 +67,39 @@ export default function SideNavBar() {
       </nav>
 
       {/* ── MOBILE: bottom tab bar (< 640 px) ─────────────────────── */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 h-14 z-[46] bg-[#0B0E11] border-t border-[#1c2d42] flex items-stretch">
-        {navItems.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              isActive(item.href) ? "text-[#00E5FF]" : "text-[#495057]"
-            }`}
-          >
-            <span
-              className="material-symbols-outlined text-[20px]"
-              style={isActive(item.href) ? { fontVariationSettings: "'FILL' 1" } : {}}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 h-16 z-[46] bg-[#0a0d10] border-t border-[#1c2d42]/60 flex items-center px-1">
+        {navItems.slice(0, 4).map((item) => {
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-1 transition-all duration-200"
             >
-              {item.icon}
-            </span>
-            <span className="text-[7px] font-bold uppercase tracking-tighter leading-none">
-              {item.label}
-            </span>
-          </Link>
-        ))}
+              {/* pill indicator */}
+              <span
+                className="flex items-center justify-center w-12 h-7 rounded-full transition-all duration-200"
+                style={active ? { background: "rgba(0,229,255,0.18)", border: "1px solid rgba(0,229,255,0.35)" } : {}}
+              >
+                <span
+                  className="material-symbols-outlined text-[20px] transition-colors duration-200"
+                  style={{
+                    color: active ? "#00E5FF" : "#495057",
+                    fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0",
+                  }}
+                >
+                  {item.icon}
+                </span>
+              </span>
+              <span
+                className="text-[9px] font-bold uppercase tracking-widest leading-none transition-colors duration-200"
+                style={{ color: active ? "#00E5FF" : "#495057" }}
+              >
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
       </nav>
     </>
   );
