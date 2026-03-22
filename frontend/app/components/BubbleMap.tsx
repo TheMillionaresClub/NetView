@@ -501,7 +501,12 @@ export default function BubbleMap({
   const [classFilter, setClassFilter] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  // Hydrate history from localStorage after mount (avoids SSR mismatch)
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
 
   const addToHistory = useCallback((address: string, label: string, counterpartyCount: number) => {
     setHistory(prev => {
