@@ -208,7 +208,7 @@ export default function DetailPanel({
     setProfileError(null);
     try {
       const res = await fetch(
-        `http://localhost:3001/api/wallet-analysis?address=${encodeURIComponent(address)}&network=${network}`
+        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/wallet-analysis?address=${encodeURIComponent(address)}&network=${network}`
       );
       if (!res.ok) throw new Error("API " + res.status);
       const data = await res.json();

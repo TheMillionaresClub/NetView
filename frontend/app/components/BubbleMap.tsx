@@ -830,7 +830,7 @@ const searchResults = knownWallets.filter((w) =>
       }
 
       const res = await fetch(
-        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`,
+        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`,
         fetchOptions
       );
       if (!res.ok) throw new Error(`API error: ${res.status}`);

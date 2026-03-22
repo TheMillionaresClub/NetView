@@ -1,0 +1,8 @@
+version: "2"
+tunnels:
+  frontend:
+    addr: 3002
+    proto: http
+  api:
+    addr: 3001
+    proto: http
