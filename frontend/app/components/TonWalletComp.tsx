@@ -49,6 +49,7 @@ export default function TonWalletComp() {
     return (
       <button
         onClick={() => open()}
+        style={{ touchAction: "manipulation" }}
         className="bg-[#00E5FF] text-[#0B0E11] px-4 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
       >
         <span className="material-symbols-outlined text-sm">

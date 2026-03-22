@@ -173,6 +173,7 @@ export default function BottomBar() {
               </p>
               <button
                 onClick={() => open()}
+                style={{ touchAction: "manipulation" }}
                 className="bg-[#00E5FF] text-[#0B0E11] px-6 py-2 text-[10px] font-headline font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm">account_balance_wallet</span>

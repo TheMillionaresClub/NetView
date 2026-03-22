@@ -1549,32 +1549,33 @@ const searchResults = knownWallets.filter((w) =>
         ) : false}
       />
 
-      {/* Connect Wallet popup — rendered OUTSIDE <main> so ReactFlow can't capture touches */}
+      {/* Connect Wallet popup — centered card, NO full-screen inset-0 overlay.
+           The old approach (fixed inset-0 z-[9999] pointer-events-none) blocked
+           touch events in Telegram's WebView even with pointer-events-none. */}
       {walletRestored && !userAddress && !manualAddress && !loading && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
-          <div
-            className="pointer-events-auto bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
-              <span className="text-3xl">&#x1F4B0;</span>
-            </div>
-            <h2 className="text-lg font-bold text-white mb-2">Connect Your Wallet</h2>
-            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-              Connect your TON wallet to explore your on-chain network, or enter an address manually above.
-            </p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                try { tonConnectUI.openModal(); } catch (err) { console.error("openModal failed:", err); }
-              }}
-              className="w-full bg-[#00E5FF] text-[#0B0E11] px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-lg
-                         hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-            >
-              Connect Wallet
-            </button>
+        <div
+          className="fixed z-[60] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                     bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl
+                     shadow-2xl p-8 max-w-sm w-[calc(100%-2rem)] text-center"
+          style={{ touchAction: "manipulation" }}
+        >
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
+            <span className="text-3xl">&#x1F4B0;</span>
           </div>
+          <h2 className="text-lg font-bold text-white mb-2">Connect Your Wallet</h2>
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+            Connect your TON wallet to explore your on-chain network, or enter an address manually above.
+          </p>
+          <button
+            onClick={() => {
+              try { tonConnectUI.openModal(); } catch (err) { console.error("openModal failed:", err); }
+            }}
+            className="w-full bg-[#00E5FF] text-[#0B0E11] px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-lg
+                       hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+            style={{ touchAction: "manipulation" }}
+          >
+            Connect Wallet
+          </button>
         </div>
       )}
     </>
