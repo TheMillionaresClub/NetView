@@ -1253,7 +1253,7 @@ const searchResults = knownWallets.filter((w) =>
         </div>
       )}
 
-      <main className="fixed left-0 sm:left-20 right-0 top-[6.5rem] sm:top-24 bottom-0 overflow-hidden"
+      <main className="fixed left-0 sm:left-20 right-0 top-[6.5rem] sm:top-24 bottom-14 sm:bottom-0 overflow-hidden"
             style={{ background: "#080d14" }}>
 
         {loading && (

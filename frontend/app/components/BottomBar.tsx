@@ -139,7 +139,7 @@ export default function BottomBar() {
   /* ── not connected ── */
   if (!restored || !connected) {
     return (
-      <footer className={`fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42] transition-all duration-300 ${collapsed ? 'h-auto' : 'h-[30vh] sm:h-[42vh]'}`}>
+      <footer className={`fixed bottom-14 sm:bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42] transition-all duration-300 ${collapsed ? 'h-auto' : 'h-[30vh] sm:h-[42vh]'}`}>
         {/* collapse toggle */}
         <button
           onClick={() => setCollapsed(c => !c)}
@@ -178,7 +178,7 @@ export default function BottomBar() {
 
   /* ── connected ── */
   return (
-    <footer className={`fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42] transition-all duration-300 ${collapsed ? 'h-auto' : 'h-[30vh] sm:h-[42vh]'}`}>
+    <footer className={`fixed bottom-14 sm:bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42] transition-all duration-300 ${collapsed ? 'h-auto' : 'h-[30vh] sm:h-[42vh]'}`}>
       {/* collapse toggle */}
       <button
         onClick={() => setCollapsed(c => !c)}
