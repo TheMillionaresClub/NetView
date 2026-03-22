@@ -76,7 +76,7 @@ export default function TracePage() {
         txLimit: String(txLimit),
       });
       const resp = await fetch(
-        `http://localhost:3001/api/trace-link?${params}`
+        `/api/trace-link?${params}`
       );
       if (!resp.ok) {
         const body = await resp.text();

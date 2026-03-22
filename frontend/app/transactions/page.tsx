@@ -6,7 +6,7 @@ import TopNavBar from "../components/TopNavBar";
 import SideNavBar from "../components/SideNavBar";
 
 const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
-const EXPRESS_API = "http://localhost:3001";
+const EXPRESS_API = "";
 
 // ── Types matching the Rust Transaction struct ───────────────────
 interface Transaction {

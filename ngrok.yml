@@ -1,0 +1,5 @@
+version: "2"
+tunnels:
+  app:
+    addr: 3002
+    proto: http

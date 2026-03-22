@@ -226,16 +226,14 @@ export default function DetailPanel({
     setLoadingProfile(true);
     setProfileError(null);
     try {
-      const [infoRes, scraperRes] = await Promise.all([
-        fetch(`http://localhost:3001/api/wallet-analysis?address=${encodeURIComponent(address)}&network=${network}`),
-        fetch(`http://localhost:3001/api/wallet-scraper?address=${encodeURIComponent(address)}&network=${network}`),
-      ]);
-
-      if (!infoRes.ok) throw new Error("API " + infoRes.status);
-      const infoData = await infoRes.json();
-      if (infoData.ok) {
-        setProfile(infoData.result);
-        onProfileFetched?.(address, infoData.result);
+      const res = await fetch(
+        `/api/wallet-analysis?address=${encodeURIComponent(address)}&network=${network}`
+      );
+      if (!res.ok) throw new Error("API " + res.status);
+      const data = await res.json();
+      if (data.ok) {
+        setProfile(data.result);
+        onProfileFetched?.(address, data.result);
       } else {
         throw new Error(infoData.error ?? "Unknown error");
       }
