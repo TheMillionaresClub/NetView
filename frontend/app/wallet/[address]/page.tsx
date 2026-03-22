@@ -71,7 +71,7 @@ export default function WalletPage() {
     <>
       <TopNavBar />
       <SideNavBar />
-      <main className="fixed left-20 right-0 top-14 bottom-0 bg-surface-container-lowest overflow-y-auto">
+      <main className="fixed left-0 sm:left-20 right-0 top-14 bottom-14 sm:bottom-0 bg-surface-container-lowest overflow-y-auto">
         <div className="max-w-4xl mx-auto p-8">
           {/* Address Header */}
           <div className="mb-8">

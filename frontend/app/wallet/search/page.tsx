@@ -31,7 +31,7 @@ export default function WalletSearchPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0B0E11] text-[#E0E0E0] pl-20 pt-14 font-body">
+    <main className="min-h-screen bg-[#0B0E11] text-[#E0E0E0] pl-0 sm:pl-20 pt-14 pb-14 sm:pb-0 font-body">
       <div className="max-w-2xl mx-auto py-16 px-6">
         {/* Header */}
         <div className="text-center mb-12">

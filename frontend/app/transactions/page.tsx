@@ -149,7 +149,7 @@ export default function TransactionsPage() {
     <>
       <TopNavBar />
       <SideNavBar />
-      <main className="fixed left-20 right-0 top-14 bottom-0 overflow-y-auto"
+      <main className="fixed left-0 sm:left-20 right-0 top-14 bottom-14 sm:bottom-0 overflow-y-auto"
             style={{ background: "#080d14" }}>
         <div className="max-w-6xl mx-auto p-6 space-y-6">
 

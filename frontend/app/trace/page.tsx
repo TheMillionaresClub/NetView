@@ -317,7 +317,7 @@ export default function TracePage() {
     <>
       <TopNavBar />
       <SideNavBar />
-      <main className="fixed left-20 right-0 top-14 bottom-0 bg-surface text-on-surface font-body overflow-hidden flex flex-col">
+      <main className="fixed left-0 sm:left-20 right-0 top-14 bottom-14 sm:bottom-0 bg-surface text-on-surface font-body overflow-hidden flex flex-col">
         {/* ── Top panel ─────────────────────────────────────────── */}
         <div className="p-4 space-y-3 border-b border-outline-variant/30 flex-shrink-0">
           <h1 className="text-xl font-headline font-bold text-primary">
