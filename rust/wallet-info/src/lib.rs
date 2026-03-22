@@ -32,7 +32,6 @@ fn parse_network(s: Option<&str>) -> Network {
 }
 
 const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new());
-const NETWORK: Network = Network::Testnet;
 
 // ── Wasm return type: transactions + optional cursor for next page ─
 #[derive(Serialize)]
@@ -44,9 +43,15 @@ struct PageResult {
     next_hash: Option<String>,
 }
 
+/// Fetch the balance for an address.
+/// `network` — `"mainnet"` or `"testnet"` (default: testnet)
 #[wasm_bindgen]
-pub async fn get_address_information(address: String) -> Result<String, JsValue> {
-    match fetch_address_balance(&CLIENT, &address, &NETWORK).await {
+pub async fn get_address_information(
+    address: String,
+    network: Option<String>,
+) -> Result<String, JsValue> {
+    let net = parse_network(network.as_deref());
+    match fetch_address_balance(&CLIENT, &address, &net).await {
         Ok(balance) => Ok(balance),
         Err(e) => Err(serde_wasm_bindgen::to_value(&e)?),
     }
@@ -57,6 +62,7 @@ pub async fn get_address_information(address: String) -> Result<String, JsValue>
 /// Pass `lt` + `hash` from the previous call's `next_lt` / `next_hash` to
 /// continue from where you left off.  When `next_lt` is `null` in the
 /// response there are no more pages.
+/// `network` — `"mainnet"` or `"testnet"` (default: testnet)
 #[wasm_bindgen]
 pub async fn get_transactions(
     address: String,
@@ -64,7 +70,10 @@ pub async fn get_transactions(
     lt:      Option<String>,
     hash:    Option<String>,
     api_key: Option<String>,
+    network: Option<String>,
 ) -> Result<JsValue, JsValue> {
+    let net = parse_network(network.as_deref());
+
     // Parse the optional lt string → u64 cursor
     let cursor: Option<(u64, String)> = match (lt, hash) {
         (Some(lt_str), Some(hash_str)) => {
@@ -78,7 +87,7 @@ pub async fn get_transactions(
 
     let cursor_ref = cursor.as_ref().map(|(lt, h)| (*lt, h.as_str()));
 
-    match get_transactions_page(&CLIENT, &NETWORK, &address, limit, cursor_ref, api_key.as_deref()).await {
+    match get_transactions_page(&CLIENT, &net, &address, limit, cursor_ref, api_key.as_deref()).await {
         Ok(result) => {
             let page = PageResult {
                 transactions: result.transactions,

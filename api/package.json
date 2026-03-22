@@ -15,7 +15,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
     "express": "^4.21.0",
-    "wallet-info": "workspace:*"
+    "wallet-info": "workspace:*",
+    "wallet-scraper": "workspace:*",
+    "ton-stats": "workspace:*"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
