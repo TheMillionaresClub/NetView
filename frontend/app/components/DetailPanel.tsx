@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-// import { useTonConnectUI } from "@tonconnect/ui-react";
+import { useTonConnectUI } from "@tonconnect/ui-react";
 
 /* ════════════════════════════════════════════════════════
    TYPES
@@ -71,17 +71,24 @@ export interface WalletProfile {
   classification: Classification;
 }
 
+const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
+
 interface Props {
   wallet: WalletData | null;
   onClose: () => void;
   flow: CounterpartyFlow | null;
   centerAddress: string | null;
   walletBalance: number | null;
-  onExpand: (address: string) => void;
-  onExpandClearAndFocus: (address: string) => void;
-  onExpandKeepExisting: (address: string) => void;
+  // Payment / network expand props
+  network: string;
+  userAddress: string;
+  onPaid: (address: string, boc: string, queryId: string) => void;
   isExpanded: boolean;
-  hasOtherExpansions: boolean;
+  isHidden: boolean;
+  canExpand: boolean;
+  onExpand: (address: string) => void;
+  onHide: (address: string) => void;
+  onShow: (address: string) => void;
   cachedProfile?: WalletProfile | null;
   onProfileFetched?: (address: string, profile: WalletProfile) => void;
 }
@@ -155,19 +162,44 @@ function tokenColor(sym: string): string {
 /* ════════════════════════════════════════════════════════
    COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function DetailPanel({ wallet, onClose, flow, centerAddress, walletBalance, onExpand, onExpandClearAndFocus, onExpandKeepExisting, isExpanded, hasOtherExpansions, cachedProfile, onProfileFetched }: Props) {
+export default function DetailPanel({
+  wallet,
+  onClose,
+  flow,
+  centerAddress,
+  walletBalance,
+  network,
+  userAddress,
+  onPaid,
+  isExpanded,
+  isHidden,
+  canExpand,
+  onExpand,
+  onHide,
+  onShow,
+  cachedProfile,
+  onProfileFetched,
+}: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const [tonConnectUI] = useTonConnectUI();
+
   const [profile, setProfile] = useState<WalletProfile | null>(cachedProfile ?? null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  /* Fetch full on-chain profile (analyze_wallet) */
+  // Payment state
+  const [paymentPending, setPaymentPending] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  // analysisPaid: true if this wallet has been paid for in this panel session
+  const [analysisPaid, setAnalysisPaid] = useState<boolean>(cachedProfile != null);
+
+  /* Fetch full on-chain profile (no payment needed for analysis endpoint) */
   const fetchFullAnalysis = useCallback(async (address: string) => {
     setLoadingProfile(true);
     setProfileError(null);
     try {
       const res = await fetch(
-        "http://localhost:3001/api/wallet-analysis?address=" + encodeURIComponent(address) + "&network=testnet"
+        `http://localhost:3001/api/wallet-analysis?address=${encodeURIComponent(address)}&network=${network}`
       );
       if (!res.ok) throw new Error("API " + res.status);
       const data = await res.json();
@@ -182,20 +214,52 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
     } finally {
       setLoadingProfile(false);
     }
-  }, [onProfileFetched]);
-
-  /* Handle "Full Analysis" button: direct fetch (no payment for testing) */
-  const handleFullAnalysis = useCallback(async () => {
-    if (!wallet) return;
-    if (profile && profile.address === wallet.id) return;
-    await fetchFullAnalysis(wallet.id);
-  }, [wallet, profile, fetchFullAnalysis]);
+  }, [onProfileFetched, network]);
 
   /* When wallet changes, restore from cache or clear */
   useEffect(() => {
-    setProfile(cachedProfile ?? null);
+    const cached = cachedProfile ?? null;
+    setProfile(cached);
     setProfileError(null);
+    setPaymentError(null);
+    setAnalysisPaid(cached != null);
   }, [wallet?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Handle payment to unlock analysis + network */
+  const handlePayForAnalysis = useCallback(async () => {
+    if (!wallet) return;
+    if (!tonConnectUI) return;
+
+    setPaymentPending(true);
+    setPaymentError(null);
+
+    try {
+      const amountNano = "10000000"; // 0.01 TON
+      const tx = await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 600,
+        messages: [
+          {
+            address: PAYMENT_ADDRESS,
+            amount: amountNano,
+          },
+        ],
+      });
+
+      const boc = tx.boc;
+      const queryId = Date.now().toString();
+
+      // Notify BubbleMap of payment
+      onPaid(wallet.id, boc, queryId);
+      setAnalysisPaid(true);
+
+      // Auto-fetch analysis after payment
+      await fetchFullAnalysis(wallet.id);
+    } catch (err: any) {
+      setPaymentError(err.message ?? "Payment failed");
+    } finally {
+      setPaymentPending(false);
+    }
+  }, [wallet, tonConnectUI, onPaid, fetchFullAnalysis]);
 
   /* Click outside / Escape to close */
   useEffect(() => {
@@ -327,61 +391,93 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
             {/* Action Buttons */}
             {!loadingProfile && (
               <div className="dp-block" style={{ textAlign: "center", padding: "16px" }}>
-                {!profile && (
+                <div className="dp-block-label" style={{ marginBottom: 8 }}>ACTIONS</div>
+
+                {/* Not yet paid: show unlock button */}
+                {!analysisPaid && (
                   <>
-                    <div className="dp-block-label" style={{ marginBottom: 8 }}>ACTIONS</div>
-                    <button className="dp-unlock-btn" onClick={handleFullAnalysis} style={{ marginBottom: 8 }}>
-                      Full Analysis
+                    {paymentError && (
+                      <div style={{ color: "#ef4444", fontSize: 10, marginBottom: 8 }}>{paymentError}</div>
+                    )}
+                    <button
+                      className="dp-unlock-btn"
+                      onClick={handlePayForAnalysis}
+                      disabled={paymentPending}
+                      style={{
+                        background: paymentPending ? "rgba(251,146,60,0.3)" : "#f59e0b",
+                        color: "#0b0e11",
+                        opacity: paymentPending ? 0.7 : 1,
+                        cursor: paymentPending ? "not-allowed" : "pointer",
+                        marginBottom: 8,
+                        width: "100%",
+                      }}
+                    >
+                      {paymentPending ? "Waiting for payment..." : "Pay 0.01 TON — Unlock Analysis + Network"}
                     </button>
                   </>
                 )}
-                {!isCenter && !isExpanded && !hasOtherExpansions && (
-                  <button
-                    className="dp-unlock-btn"
-                    onClick={() => onExpand(wallet.id)}
-                    style={{
-                      background: "transparent",
-                      color: "#00e5ff",
-                      border: "1px solid #00e5ff",
-                      marginLeft: profile ? 0 : 8,
-                    }}
-                  >
-                    Expand Network
-                  </button>
-                )}
-                {!isCenter && !isExpanded && hasOtherExpansions && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8, width: "100%" }}>
-                    <div className="dp-block-label" style={{ marginBottom: 4 }}>EXPAND NETWORK</div>
-                    <button
-                      className="dp-unlock-btn"
-                      onClick={() => onExpandClearAndFocus(wallet.id)}
-                      style={{
-                        background: "rgba(234,88,12,0.25)",
-                        color: "#fb923c",
-                        border: "1px solid rgba(251,146,60,0.5)",
-                        fontSize: 11,
-                      }}
-                    >
-                      Clear &amp; Focus on this wallet
-                    </button>
-                    <button
-                      className="dp-unlock-btn"
-                      onClick={() => onExpandKeepExisting(wallet.id)}
-                      style={{
-                        background: "rgba(37,99,235,0.25)",
-                        color: "#60a5fa",
-                        border: "1px solid rgba(96,165,250,0.5)",
-                        fontSize: 11,
-                      }}
-                    >
-                      Keep existing &amp; add on top
-                    </button>
-                  </div>
-                )}
-                {isExpanded && (
-                  <div className="dp-sub-text" style={{ marginTop: 8 }}>
-                    Network expanded
-                  </div>
+
+                {/* Paid: show expand/hide/show network buttons */}
+                {analysisPaid && !isCenter && (
+                  <>
+                    {/* Can expand (paid but not yet expanded) */}
+                    {canExpand && !isExpanded && (
+                      <button
+                        className="dp-unlock-btn"
+                        onClick={() => onExpand(wallet.id)}
+                        style={{
+                          background: "transparent",
+                          color: "#00e5ff",
+                          border: "1px solid #00e5ff",
+                          marginBottom: 8,
+                          width: "100%",
+                        }}
+                      >
+                        Expand Network
+                      </button>
+                    )}
+
+                    {/* Expanded and not hidden: show Hide button */}
+                    {isExpanded && !isHidden && (
+                      <button
+                        className="dp-unlock-btn"
+                        onClick={() => onHide(wallet.id)}
+                        style={{
+                          background: "transparent",
+                          color: "#f59e0b",
+                          border: "1px solid #f59e0b",
+                          marginBottom: 8,
+                          width: "100%",
+                        }}
+                      >
+                        Hide Network
+                      </button>
+                    )}
+
+                    {/* Expanded and hidden: show Show button */}
+                    {isExpanded && isHidden && (
+                      <button
+                        className="dp-unlock-btn"
+                        onClick={() => onShow(wallet.id)}
+                        style={{
+                          background: "transparent",
+                          color: "#22c55e",
+                          border: "1px solid #22c55e",
+                          marginBottom: 8,
+                          width: "100%",
+                        }}
+                      >
+                        Show Network
+                      </button>
+                    )}
+
+                    {/* Already expanded indicator */}
+                    {isExpanded && (
+                      <div className="dp-sub-text" style={{ marginTop: 4 }}>
+                        Network expanded
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -568,7 +664,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
                     {flow.txCount} transaction{flow.txCount !== 1 ? "s" : ""} with your wallet
                   </div>
                   <div className="dp-sub-text">
-                    Use &quot;Full Analysis&quot; to see all transactions, jettons, NFTs and classification
+                    Pay to unlock full analysis: transactions, jettons, NFTs and classification
                   </div>
                 </div>
               </>
@@ -577,7 +673,9 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
             {!profile && !flow && (
               <div style={{ padding: "24px 16px", textAlign: "center" }}>
                 <div className="dp-sub-text">
-                  This is your connected wallet
+                  {userAddress && wallet.id === userAddress
+                    ? "This is your connected wallet"
+                    : "Pay to unlock full analysis"}
                 </div>
               </div>
             )}
@@ -615,7 +713,6 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
 
 /* ════════════════════════════════════════════════════════
    HELPER: Aggregate transactions by counterparty
-   Each address appears once with total sent/received/txCount
 ════════════════════════════════════════════════════════ */
 interface AggregatedCounterparty {
   address: string;

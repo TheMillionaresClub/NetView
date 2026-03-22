@@ -21,7 +21,7 @@ import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
 
-import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
+import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
 
 /* ================================================================
    TYPES
@@ -48,6 +48,18 @@ export interface WalletInfo {
   txCount: number;
   isCenter: boolean;
 }
+
+interface NetworkData {
+  counterparties: Counterparty[];
+  totalTxFetched: number;
+  balanceNano: number | null;
+}
+
+/* ================================================================
+   CONSTANTS
+================================================================ */
+const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
+const PAID_WALLETS_LS_KEY = "netview-paid";
 
 /* ================================================================
    HELPERS
@@ -77,6 +89,42 @@ function edgeKey(a: string, b: string) {
   return a < b ? `edge-${a}-${b}` : `edge-${b}-${a}`;
 }
 
+function loadPaidWallets(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(PAID_WALLETS_LS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set<string>(Array.isArray(arr) ? arr : []);
+  } catch { return new Set(); }
+}
+
+function savePaidWallets(set: Set<string>) {
+  try {
+    localStorage.setItem(PAID_WALLETS_LS_KEY, JSON.stringify(Array.from(set)));
+  } catch { /* quota */ }
+}
+
+const NETWORK_CACHE_LS_KEY = "netview-cache";
+
+function loadNetworkCache(): Map<string, NetworkData> {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const raw = localStorage.getItem(NETWORK_CACHE_LS_KEY);
+    if (!raw) return new Map();
+    const obj = JSON.parse(raw);
+    return new Map<string, NetworkData>(Object.entries(obj));
+  } catch { return new Map(); }
+}
+
+function saveNetworkCache(cache: Map<string, NetworkData>) {
+  try {
+    // Keep only the 20 most-recently-set entries to avoid quota issues
+    const entries = [...cache.entries()];
+    const trimmed = entries.slice(-20);
+    localStorage.setItem(NETWORK_CACHE_LS_KEY, JSON.stringify(Object.fromEntries(trimmed)));
+  } catch { /* quota */ }
+}
 
 const THEMES: Record<string, { ring: string; glow: string; bg: string }> = {
   center:   { ring: "border-orange-400", glow: "shadow-[0_0_22px_rgba(249,115,22,.45)]",  bg: "bg-orange-900/60"  },
@@ -238,7 +286,7 @@ function loadHistory(): HistoryEntry[] {
 
 function saveHistory(entries: HistoryEntry[]) {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, 50))); // keep last 50
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, 50)));
   } catch { /* quota */ }
 }
 
@@ -268,11 +316,7 @@ function saveToStorage(nodes: any[], edges: any[], centerAddress: string, expand
 }
 
 /* ================================================================
-   FORCE-DIRECTED LAYOUT  (Coggle-style realign)
-   Pure frontend — no external deps. Iterative simulation:
-   1. Repulsion between every pair of nodes (scaled by radius)
-   2. Spring attraction along edges
-   3. Gentle gravity toward the center node
+   FORCE-DIRECTED LAYOUT
 ================================================================ */
 function forceLayout(
   nodes: any[],
@@ -281,7 +325,6 @@ function forceLayout(
 ): any[] {
   if (nodes.length < 2) return nodes;
 
-  // Work on a mutable copy of positions
   type Vec = { x: number; y: number };
   const pos: Record<string, Vec> = {};
   const radii: Record<string, number> = {};
@@ -293,27 +336,24 @@ function forceLayout(
     ids.push(n.id);
   }
 
-  // Find center node (isCenter) for gravity anchor
   const centerNode = nodes.find((n: any) => n.data?.walletInfo?.isCenter);
   const centerId = centerNode?.id ?? ids[0];
 
-  // Build adjacency from edges
   const adj = new Set<string>();
   for (const e of edges) {
     adj.add(`${e.source}|${e.target}`);
     adj.add(`${e.target}|${e.source}`);
   }
 
-  const REPULSION = 80_000;      // repulsion strength
-  const SPRING_K_BASE = 0.006;   // base edge spring stiffness
-  const SPRING_LEN_MAX = 450;    // ideal length for weakest edge
-  const SPRING_LEN_MIN = 120;    // ideal length for strongest edge
-  const GRAVITY = 0.002;         // pull toward center
-  const DAMPING = 0.92;          // velocity damping
-  const MIN_DIST = 20;           // avoid division by zero
-  const MAX_FORCE = 60;          // clamp per-axis force
+  const REPULSION = 80_000;
+  const SPRING_K_BASE = 0.006;
+  const SPRING_LEN_MAX = 450;
+  const SPRING_LEN_MIN = 120;
+  const GRAVITY = 0.002;
+  const DAMPING = 0.92;
+  const MIN_DIST = 20;
+  const MAX_FORCE = 60;
 
-  // Compute max weight across all edges for normalisation
   let maxWeight = 1;
   for (const e of edges) {
     const tx = (e.data?.txCount ?? 1) as number;
@@ -321,15 +361,14 @@ function forceLayout(
     const w = tx + vol * 0.5;
     if (w > maxWeight) maxWeight = w;
   }
-  // Build per-edge weight lookup (source|target -> { springLen, springK })
   const edgeParams: Record<string, { springLen: number; springK: number }> = {};
   for (const e of edges) {
     const tx = (e.data?.txCount ?? 1) as number;
     const vol = (e.data?.volumeTON ?? 0) as number;
     const w = tx + vol * 0.5;
-    const ratio = w / maxWeight;  // 0..1 (1 = strongest relationship)
+    const ratio = w / maxWeight;
     const springLen = SPRING_LEN_MAX - ratio * (SPRING_LEN_MAX - SPRING_LEN_MIN);
-    const springK = SPRING_K_BASE * (1 + ratio * 3); // stronger pull for closer wallets
+    const springK = SPRING_K_BASE * (1 + ratio * 3);
     const key1 = `${e.source}|${e.target}`;
     const key2 = `${e.target}|${e.source}`;
     edgeParams[key1] = { springLen, springK };
@@ -340,11 +379,10 @@ function forceLayout(
   for (const id of ids) vel[id] = { x: 0, y: 0 };
 
   for (let iter = 0; iter < iterations; iter++) {
-    const temp = 1 - iter / iterations; // cooling
+    const temp = 1 - iter / iterations;
     const forces: Record<string, Vec> = {};
     for (const id of ids) forces[id] = { x: 0, y: 0 };
 
-    // 1. Repulsion (every pair)
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
         const a = ids[i], b = ids[j];
@@ -353,7 +391,6 @@ function forceLayout(
         let dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < MIN_DIST) { dx = (Math.random() - 0.5) * 40; dy = (Math.random() - 0.5) * 40; dist = MIN_DIST; }
 
-        // Extra repulsion when circles overlap
         const overlap = (radii[a] + radii[b] + 30) - dist;
         const overlapMult = overlap > 0 ? 1 + overlap * 0.05 : 1;
 
@@ -365,7 +402,6 @@ function forceLayout(
       }
     }
 
-    // 2. Edge springs (weighted: closer relationship → shorter spring)
     for (const e of edges) {
       const a = e.source as string;
       const b = e.target as string;
@@ -382,7 +418,6 @@ function forceLayout(
       forces[b].x -= fx; forces[b].y -= fy;
     }
 
-    // 3. Gravity toward center node
     const cx = pos[centerId]?.x ?? 0;
     const cy = pos[centerId]?.y ?? 0;
     for (const id of ids) {
@@ -391,9 +426,8 @@ function forceLayout(
       forces[id].y -= (pos[id].y - cy) * GRAVITY;
     }
 
-    // 4. Apply forces with damping & cooling
     for (const id of ids) {
-      if (id === centerId) continue; // pin center
+      if (id === centerId) continue;
       const fx = Math.max(-MAX_FORCE, Math.min(MAX_FORCE, forces[id].x)) * temp;
       const fy = Math.max(-MAX_FORCE, Math.min(MAX_FORCE, forces[id].y)) * temp;
       vel[id].x = (vel[id].x + fx) * DAMPING;
@@ -403,7 +437,6 @@ function forceLayout(
     }
   }
 
-  // Return nodes with updated positions
   return nodes.map((n: any) => ({
     ...n,
     position: { x: Math.round(pos[n.id].x), y: Math.round(pos[n.id].y) },
@@ -434,34 +467,42 @@ export default function BubbleMap({
   const [expandedAddresses, setExpandedAddresses] = useState<string[]>([]);
   const [knownWallets, setKnownWallets] = useState<WalletInfo[]>([]);
   const [counterpartyMap, setCounterpartyMap] = useState<Map<string, Counterparty>>(new Map());
-  /** Balance data from interacted_wallets (address -> nano balance) */
   const [walletBalances, setWalletBalances] = useState<Map<string, number>>(new Map());
-  /** Track the current center address */
   const [centerAddr, setCenterAddr] = useState<string>("");
-  /** Cache of fetched WalletProfile results so re-opening a node doesn't lose data */
   const [profileCache, setProfileCache] = useState<Map<string, WalletProfile>>(new Map());
+
+  // Payment-related state
+  const [paidWallets, setPaidWallets] = useState<Set<string>>(() => loadPaidWallets());
+  const paidWalletsRef = useRef<Set<string>>(new Set());
+  const networkDataCache = useRef<Map<string, NetworkData>>(loadNetworkCache());
+  const networkDataCacheRef = networkDataCache;
+
+  const [networkLocked, setNetworkLocked] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  // pendingExpand: address -> { boc, queryId } — payment stored for optional expand
+  const [pendingExpand, setPendingExpand] = useState<Map<string, { boc: string; queryId: string }>>(new Map());
+  // hiddenNetworks: addresses whose expanded network is hidden
+  const [hiddenNetworks, setHiddenNetworks] = useState<Set<string>>(new Set());
+
+  // Keep ref in sync
+  useEffect(() => {
+    paidWalletsRef.current = paidWallets;
+  }, [paidWallets]);
 
   const handleProfileFetched = useCallback((address: string, profile: WalletProfile) => {
     setProfileCache(prev => new Map(prev).set(address, profile));
   }, []);
 
-  /** Track which expanded wallet originated each edge: edgeId -> originAddr */
   const [edgeOriginMap, setEdgeOriginMap] = useState<Map<string, string>>(new Map());
-  /** Filter: focus on a single expanded wallet's sub-network (null = show all) */
   const [focusWallet, setFocusWallet] = useState<string | null>(null);
-  /** Filter: which classifications are visible (empty = all visible) */
   const [classFilter, setClassFilter] = useState<Set<string>>(new Set());
-  /** Filter panel open/close */
   const [filterOpen, setFilterOpen] = useState(false);
-  /** History panel open/close */
   const [historyOpen, setHistoryOpen] = useState(false);
-
-  /** Tracking history */
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
 
   const addToHistory = useCallback((address: string, label: string, counterpartyCount: number) => {
     setHistory(prev => {
-      // Deduplicate: remove old entry for same address, then prepend
       const filtered = prev.filter(h => h.address !== address);
       const updated = [{ address, label, timestamp: Date.now(), counterpartyCount }, ...filtered].slice(0, 50);
       saveHistory(updated);
@@ -481,65 +522,47 @@ export default function BubbleMap({
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
+  const tonWallet = useTonWallet();
+  const currentNetwork = tonWallet?.account?.chain === "-239" ? "mainnet" : "testnet";
+
   const [activeAddress, setActiveAddress] = useState<string>("");
-  // Track which address we last loaded so we can detect changes
   const lastLoadedRef = useRef<string>("");
 
-  // Normalize the raw address to canonical EQ form via the API
+  // Normalize the raw address
   useEffect(() => {
     const raw = manualAddress || userAddress || "";
     if (!raw) { setActiveAddress(""); return; }
     normalizeToBounceable(raw).then(setActiveAddress);
   }, [manualAddress, userAddress]);
 
-  const searchResults = knownWallets.filter((w) =>
+  // Normalize userAddress for comparison
+  const [normalizedUserAddress, setNormalizedUserAddress] = useState<string>("");
+  useEffect(() => {
+    if (!userAddress) { setNormalizedUserAddress(""); return; }
+    normalizeToBounceable(userAddress).then(setNormalizedUserAddress);
+  }, [userAddress]);
+
+const searchResults = knownWallets.filter((w) =>
     w.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  /* -- Fetch network graph from API -- */
-  const fetchFullAnalysis = useCallback(async (address: string): Promise<{ counterparties: Counterparty[]; totalTxFetched: number; balanceNano: number | null } | null> => {
-    try {
-      const res = await fetch(
-        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`
-      );
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "Unknown error");
-      const r = json.result;
-      return {
-        counterparties: r.counterparties ?? [],
-        totalTxFetched: r.totalTxFetched ?? 0,
-        balanceNano: r.balanceNano ?? null,
-      };
-    } catch (err) {
-      console.error("fetchFullAnalysis error:", err);
-      return null;
-    }
-  }, []);
-
-  /* -- Build edges with correct colors and directions -- */
+  /* ----------------------------------------------------------------
+     buildEdges
+  ---------------------------------------------------------------- */
   const buildEdges = useCallback((originAddr: string, counterparties: Counterparty[]) => {
     return counterparties.map((cp) => {
-      const sentTON = nanoToTON(cp.sentNano);     // center sent TO counterparty
-      const recvTON = nanoToTON(cp.receivedNano);  // center received FROM counterparty
+      const sentTON = nanoToTON(cp.sentNano);
+      const recvTON = nanoToTON(cp.receivedNano);
       const isBidirectional = sentTON > 0 && recvTON > 0;
       const isSending = sentTON > 0 && recvTON === 0;
-      // isSending = center sent to cp (red, arrow away from center)
-      // !isSending && !isBidirectional = cp sent to center (green, arrow toward center)
 
-      // Green: received by center (arrow toward center)
-      // Red: sent from center (arrow away from center)
-      // Blue: bidirectional
       const color = isBidirectional ? '#3b82f6' : (isSending ? '#ef4444' : '#22c55e');
 
       const label = isBidirectional
         ? `S: ${fmtVol(sentTON)} | R: ${fmtVol(recvTON)} TON`
         : `${fmtVol(isSending ? sentTON : recvTON)} TON`;
 
-      // For red (sending from center): source=center, target=cp (arrow points away)
-      // For green (receiving at center): source=cp, target=center (arrow points toward center)
-      // For blue: source=center, target=cp with both markers
       const source = isSending || isBidirectional ? originAddr : cp.address;
       const target = isSending || isBidirectional ? cp.address : originAddr;
 
@@ -570,7 +593,9 @@ export default function BubbleMap({
     });
   }, []);
 
-  /* -- Clear all state for a fresh load -- */
+  /* ----------------------------------------------------------------
+     clearGraph
+  ---------------------------------------------------------------- */
   const clearGraph = useCallback(() => {
     setNodes([]);
     setEdges([]);
@@ -587,62 +612,86 @@ export default function BubbleMap({
     localStorage.removeItem(LS_KEY);
   }, [setNodes, setEdges]);
 
-  /* -- Load from full analysis and add nodes/edges -- */
-  const loadFromFullAnalysis = useCallback(async (
+  /* ----------------------------------------------------------------
+     showCenterBubble — place single bubble for an address
+  ---------------------------------------------------------------- */
+  const showCenterBubble = useCallback((address: string, label: string) => {
+    const walletInfo: WalletInfo = {
+      id: address,
+      label,
+      volumeTON: 0,
+      txCount: 0,
+      isCenter: true,
+    };
+    setNodes([{
+      id: address,
+      type: "person",
+      position: { x: 0, y: 0 },
+      data: {
+        label,
+        volumeTON: 0,
+        radius: 55,
+        walletInfo,
+        classification: "center",
+        selected: false,
+        isExpanded: false,
+        onSelect: setSelected,
+      },
+    }]);
+    setEdges([]);
+    setCenterAddr(address);
+    setKnownWallets([walletInfo]);
+  }, [setNodes, setEdges]);
+
+  /* ----------------------------------------------------------------
+     applyNetworkData — build graph from NetworkData (no API call)
+  ---------------------------------------------------------------- */
+  const applyNetworkData = useCallback((
     address: string,
     isCenter: boolean,
+    data: NetworkData,
   ) => {
-    setLoading(true);
-    setError(null);
-
-    const profile = await fetchFullAnalysis(address);
-    if (!profile) {
-      setError("Failed to fetch on-chain data. Is the API server running?");
-      setLoading(false);
-      return;
-    }
-
     const canonAddr = address;
-    const counterparties = profile.counterparties;
+    const { counterparties, totalTxFetched, balanceNano } = data;
 
-    // Store balance for the center wallet
     setWalletBalances((prev) => {
       const next = new Map(prev);
-      if (profile.balanceNano != null) {
-        next.set(canonAddr, profile.balanceNano);
-      }
+      if (balanceNano != null) next.set(canonAddr, balanceNano);
       return next;
     });
 
-    if (isCenter) {
-      setCenterAddr(canonAddr);
-    }
+    if (isCenter) setCenterAddr(canonAddr);
 
     setNodes((prevNodes: any[]) => {
       const nodeMap = new Map<string, any>();
       for (const n of prevNodes) nodeMap.set(n.id, n);
 
-      // Ensure the center/expanded address node exists
       if (!nodeMap.has(canonAddr)) {
-        const totalTx = profile.totalTxFetched;
         nodeMap.set(canonAddr, {
           id: canonAddr,
           type: "person",
           position: { x: 0, y: 0 },
           data: {
-            label: isCenter ? "Center" : shortAddr(canonAddr),
+            label: isCenter ? shortAddr(canonAddr) : shortAddr(canonAddr),
             volumeTON: 0,
-            radius: isCenter ? 55 : calcRadius(totalTx),
-            walletInfo: { id: canonAddr, label: isCenter ? "Center" : shortAddr(canonAddr), volumeTON: 0, txCount: totalTx, isCenter },
-            classification: isCenter ? "center" : classifyByTxCount(totalTx),
+            radius: isCenter ? 55 : calcRadius(totalTxFetched),
+            walletInfo: {
+              id: canonAddr,
+              label: isCenter ? shortAddr(canonAddr) : shortAddr(canonAddr),
+              volumeTON: 0,
+              txCount: totalTxFetched,
+              isCenter,
+            },
+            classification: isCenter ? "center" : classifyByTxCount(totalTxFetched),
             selected: false,
+            isExpanded: false,
             onSelect: setSelected,
           },
         });
       } else {
         const existing = nodeMap.get(canonAddr)!;
         const oldTx = existing.data.walletInfo.txCount;
-        const newTx = Math.max(oldTx, profile.totalTxFetched);
+        const newTx = Math.max(oldTx, totalTxFetched);
         if (newTx > oldTx) {
           const wi = { ...existing.data.walletInfo, txCount: newTx };
           nodeMap.set(canonAddr, {
@@ -657,7 +706,6 @@ export default function BubbleMap({
         }
       }
 
-      // Get the orbit center position from the expanded node
       const orbitNode = nodeMap.get(canonAddr);
       const cx = orbitNode?.position?.x ?? 0;
       const cy = orbitNode?.position?.y ?? 0;
@@ -667,7 +715,6 @@ export default function BubbleMap({
         const volTON = nanoToTON(cp.sentNano + cp.receivedNano);
 
         if (nodeMap.has(cp.address)) {
-          // Merge into existing node
           const existing = nodeMap.get(cp.address)!;
           const oldTx = existing.data.walletInfo.txCount;
           const mergedTx = oldTx + cp.txCount;
@@ -686,7 +733,6 @@ export default function BubbleMap({
           return;
         }
 
-        // New node
         const r = calcRadius(cp.txCount);
         const angle = (i / counterparties.length) * 2 * Math.PI;
         const jitter = (Math.random() - 0.5) * 120;
@@ -713,6 +759,7 @@ export default function BubbleMap({
             walletInfo,
             classification: classifyByTxCount(cp.txCount),
             selected: false,
+            isExpanded: false,
             onSelect: setSelected,
           },
         });
@@ -721,11 +768,9 @@ export default function BubbleMap({
       const allNodes = Array.from(nodeMap.values());
       const allWallets: WalletInfo[] = allNodes.map((n: any) => n.data.walletInfo);
       setKnownWallets(allWallets);
-
       return allNodes;
     });
 
-    // Build and merge edges (deduped)
     const newEdges = buildEdges(canonAddr, counterparties);
     setEdges((prevEdges: any[]) => {
       const existingIds = new Set(prevEdges.map((e: any) => e.id));
@@ -733,14 +778,12 @@ export default function BubbleMap({
       return [...prevEdges, ...toAdd];
     });
 
-    // Track which expanded wallet originated each edge
     setEdgeOriginMap((prev) => {
       const next = new Map(prev);
       for (const e of newEdges) next.set(e.id, canonAddr);
       return next;
     });
 
-    // Store counterparty flow data
     setCounterpartyMap((prev) => {
       const next = new Map(prev);
       for (const cp of counterparties) {
@@ -760,34 +803,170 @@ export default function BubbleMap({
       return next;
     });
 
-    setExpandedAddresses((prev) => [...prev, canonAddr]);
-    setLoading(false);
-  }, [fetchFullAnalysis, buildEdges, setNodes, setEdges]);
+    setExpandedAddresses((prev) =>
+      prev.includes(canonAddr) ? prev : [...prev, canonAddr]
+    );
+  }, [buildEdges, setNodes, setEdges]);
 
-  /* -- Handle expanding a secondary wallet's network (simple expand) -- */
+  /* ----------------------------------------------------------------
+     loadNetworkWithPayment — fetch API with payment header, then apply
+  ---------------------------------------------------------------- */
+  const loadNetworkWithPayment = useCallback(async (
+    address: string,
+    isCenter: boolean,
+    boc: string,
+    queryId: string,
+    fromAddress: string,
+    network: string,
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const payloadObj = { scheme: "ton-v1", network, boc, fromAddress, queryId };
+      const paymentSig = btoa(JSON.stringify(payloadObj));
+
+      const res = await fetch(
+        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`,
+        {
+          headers: {
+            "PAYMENT-SIGNATURE": paymentSig,
+          },
+        }
+      );
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "Unknown error");
+
+      const r = json.result;
+      const data: NetworkData = {
+        counterparties: r.counterparties ?? [],
+        totalTxFetched: r.totalTxFetched ?? 0,
+        balanceNano: r.balanceNano ?? null,
+      };
+
+      // Cache the result (persist to localStorage for session-free history)
+      networkDataCacheRef.current.set(address, data);
+      saveNetworkCache(networkDataCacheRef.current);
+
+      applyNetworkData(address, isCenter, data);
+    } catch (err: any) {
+      setError("Failed to load network: " + (err.message ?? "Unknown error"));
+    } finally {
+      setLoading(false);
+    }
+  }, [applyNetworkData, networkDataCacheRef]);
+
+  /* ----------------------------------------------------------------
+     handlePayForNetwork — pay for the manualAddress network (LOAD flow)
+  ---------------------------------------------------------------- */
+  const handlePayForNetwork = useCallback(async () => {
+    if (!manualAddress || !activeAddress) return;
+    if (!tonConnectUI) return;
+
+    setPaymentPending(true);
+    setPaymentError(null);
+
+    try {
+      const amountNano = "10000000"; // 0.01 TON in nanotons
+      const tx = await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 600,
+        messages: [
+          {
+            address: PAYMENT_ADDRESS,
+            amount: amountNano,
+          },
+        ],
+      });
+
+      const boc = tx.boc;
+      const queryId = Date.now().toString();
+      const fromAddress = userAddress || "";
+
+      // Mark as paid
+      const newPaid = new Set(paidWalletsRef.current);
+      newPaid.add(activeAddress);
+      setPaidWallets(newPaid);
+      savePaidWallets(newPaid);
+      setNetworkLocked(false);
+
+      // Load network with payment
+      await loadNetworkWithPayment(
+        activeAddress, true, boc, queryId, fromAddress, currentNetwork
+      );
+      addToHistory(activeAddress, shortAddr(activeAddress), 0);
+    } catch (err: any) {
+      setPaymentError(err.message ?? "Payment failed");
+    } finally {
+      setPaymentPending(false);
+    }
+  }, [manualAddress, activeAddress, tonConnectUI, userAddress, loadNetworkWithPayment, currentNetwork, addToHistory]);
+
+  /* ----------------------------------------------------------------
+     handleOnPaid — called from DetailPanel after payment done
+     Marks as paid, stores pendingExpand (no auto-expand)
+  ---------------------------------------------------------------- */
+  const handleOnPaid = useCallback((address: string, boc: string, queryId: string) => {
+    const newPaid = new Set(paidWalletsRef.current);
+    newPaid.add(address);
+    setPaidWallets(newPaid);
+    savePaidWallets(newPaid);
+    setNetworkLocked(false);
+
+    // If the paid address is the center (manual search), auto-load the network immediately
+    if (address === activeAddress && !!manualAddress) {
+      loadNetworkWithPayment(address, true, boc, queryId, userAddress || "", currentNetwork);
+    } else {
+      // For side bubbles, store payment for optional expand
+      setPendingExpand(prev => {
+        const next = new Map(prev);
+        next.set(address, { boc, queryId });
+        return next;
+      });
+    }
+  }, [activeAddress, manualAddress, userAddress, currentNetwork, loadNetworkWithPayment]);
+
+  /* ----------------------------------------------------------------
+     handleExpand — expand network for address using stored payment
+  ---------------------------------------------------------------- */
   const handleExpand = useCallback(async (address: string) => {
     if (expandedAddresses.includes(address)) return;
-    await loadFromFullAnalysis(address, false);
-    addToHistory(address, shortAddr(address), 0);
-  }, [expandedAddresses, loadFromFullAnalysis, addToHistory]);
 
-  /** Clear old expansions and focus on a specific wallet */
-  const handleExpandClearAndFocus = useCallback(async (address: string) => {
-    // Clear the graph but keep center, reload center + new wallet
-    clearGraph();
-    if (activeAddress) {
-      lastLoadedRef.current = "";
-      await loadFromFullAnalysis(activeAddress, true);
+    // Check cache first
+    const cached = networkDataCacheRef.current.get(address);
+    if (cached) {
+      applyNetworkData(address, false, cached);
+      addToHistory(address, shortAddr(address), cached.counterparties.length);
+      return;
     }
-    await loadFromFullAnalysis(address, false);
-    addToHistory(address, shortAddr(address), 0);
-  }, [clearGraph, activeAddress, loadFromFullAnalysis, addToHistory]);
 
-  /** Keep existing expansions and add a wallet on top */
-  const handleExpandKeepExisting = useCallback(async (address: string) => {
-    await loadFromFullAnalysis(address, false);
+    // Check pending payment
+    const pending = pendingExpand.get(address);
+    if (!pending) return;
+
+    const fromAddress = userAddress || "";
+    await loadNetworkWithPayment(
+      address, false, pending.boc, pending.queryId, fromAddress, currentNetwork
+    );
     addToHistory(address, shortAddr(address), 0);
-  }, [loadFromFullAnalysis, addToHistory]);
+  }, [expandedAddresses, pendingExpand, networkDataCacheRef, applyNetworkData, loadNetworkWithPayment, userAddress, currentNetwork, addToHistory]);
+
+  /* ----------------------------------------------------------------
+     handleHide — hide edges/nodes for that address's network
+  ---------------------------------------------------------------- */
+  const handleHide = useCallback((address: string) => {
+    setHiddenNetworks(prev => new Set([...prev, address]));
+  }, []);
+
+  /* ----------------------------------------------------------------
+     handleShow — un-hide network for address
+  ---------------------------------------------------------------- */
+  const handleShow = useCallback((address: string) => {
+    setHiddenNetworks(prev => {
+      const next = new Set(prev);
+      next.delete(address);
+      return next;
+    });
+  }, []);
 
   /** Load a wallet from history as a new center */
   const loadFromHistory = useCallback(async (address: string) => {
@@ -795,36 +974,73 @@ export default function BubbleMap({
     setManualAddress(address);
   }, [setManualAddress]);
 
-  /* -- Initial load when activeAddress changes -- */
+  /* ----------------------------------------------------------------
+     Main effect: react to activeAddress changes
+  ---------------------------------------------------------------- */
   useEffect(() => {
     if (!activeAddress) {
+      // No address: show placeholder bubble
       setNodes([{
         id: "placeholder",
         type: "person",
         position: { x: 0, y: 0 },
         data: {
-          label: "Enter Wallet",
+          label: "Connect Wallet",
           volumeTON: 0,
           radius: 55,
-          walletInfo: { id: "placeholder", label: "Enter Wallet", volumeTON: 0, txCount: 0, isCenter: true },
+          walletInfo: { id: "placeholder", label: "Connect Wallet", volumeTON: 0, txCount: 0, isCenter: true },
           classification: "center",
           selected: false,
+          isExpanded: false,
           onSelect: () => {},
         },
       }]);
+      setEdges([]);
       return;
     }
 
-    // Don't reload if same address
     if (lastLoadedRef.current === activeAddress) return;
     lastLoadedRef.current = activeAddress;
 
-    // Clear and load fresh
+    // Always clear graph first
     clearGraph();
-    loadFromFullAnalysis(activeAddress, true);
-    addToHistory(activeAddress, shortAddr(activeAddress), 0);
+
+    const isOwnWallet = normalizedUserAddress && activeAddress === normalizedUserAddress;
+    // Use manualAddress directly (not normalizedManualAddress which is set async and may not be ready yet)
+    const isManual = !!manualAddress;
+
+    if (isOwnWallet && !isManual) {
+      // Show center bubble labeled "You" — no payment gate
+      showCenterBubble(activeAddress, "You");
+      return;
+    }
+
+    if (isManual) {
+      // Check if already paid
+      if (paidWalletsRef.current.has(activeAddress)) {
+        // Check in-memory cache
+        const cached = networkDataCacheRef.current.get(activeAddress);
+        if (cached) {
+          applyNetworkData(activeAddress, true, cached);
+          addToHistory(activeAddress, shortAddr(activeAddress), cached.counterparties.length);
+          return;
+        }
+        // Paid but no cache — show payment banner again (user needs to re-pay this session)
+        showCenterBubble(activeAddress, shortAddr(activeAddress));
+        setNetworkLocked(true);
+        return;
+      }
+
+      // Not paid — show center bubble + locked banner
+      showCenterBubble(activeAddress, shortAddr(activeAddress));
+      setNetworkLocked(true);
+      return;
+    }
+
+    // Fallback: just show center bubble
+    showCenterBubble(activeAddress, shortAddr(activeAddress));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAddress]);
+  }, [activeAddress, manualAddress]);
 
   /* -- Click a node: just select it -- */
   const handleSelectNode = useCallback((walletInfo: WalletInfo) => {
@@ -872,9 +1088,20 @@ export default function BubbleMap({
   const ALL_CLASSES = ["whale", "trader", "degen", "investor"];
   const hasClassFilter = classFilter.size > 0;
 
+  // Hidden network edges: edges whose origin is in hiddenNetworks
   const filteredEdges = useMemo(() => {
     let result = edges;
-    // Focus filter: show only edges from this expanded wallet
+    // Hide edges for hidden networks, but always keep edges between "anchor" nodes
+    // (center + expanded wallets) — e.g. the center↔expanded edge must survive a hide
+    if (hiddenNetworks.size > 0) {
+      const anchorSet = new Set<string>([centerAddr, ...expandedAddresses]);
+      result = result.filter((e: any) => {
+        const origin = edgeOriginMap.get(e.id) ?? (e.data as any)?.origin;
+        if (!hiddenNetworks.has(origin)) return true;
+        // Keep edge if BOTH endpoints are anchor nodes (center or another expanded wallet)
+        return anchorSet.has(e.source as string) && anchorSet.has(e.target as string);
+      });
+    }
     if (focusWallet) {
       result = result.filter((e: any) => {
         const origin = edgeOriginMap.get(e.id) ?? (e.data as any)?.origin;
@@ -882,16 +1109,34 @@ export default function BubbleMap({
       });
     }
     return result;
-  }, [edges, focusWallet, edgeOriginMap]);
+  }, [edges, focusWallet, edgeOriginMap, hiddenNetworks]);
 
   const filteredNodes = useMemo(() => {
     let result = nodes;
 
-    // Focus filter: show only center node + the focused wallet + its connected counterparties
+    // For hidden networks: remove nodes that are exclusively connected via hidden origins
+    if (hiddenNetworks.size > 0) {
+      const visibleEdgesForNodes = edges.filter((e: any) => {
+        const origin = edgeOriginMap.get(e.id) ?? (e.data as any)?.origin;
+        return !hiddenNetworks.has(origin);
+      });
+      const connectedToVisible = new Set<string>();
+      for (const e of visibleEdgesForNodes) {
+        connectedToVisible.add(e.source as string);
+        connectedToVisible.add(e.target as string);
+      }
+      // Always keep center node and expanded address nodes (even when their network is hidden)
+      const alwaysKeep = new Set<string>([centerAddr, ...expandedAddresses]);
+      result = result.filter((n: any) => {
+        if (n.data?.walletInfo?.isCenter) return true;
+        if (alwaysKeep.has(n.id)) return true;
+        return connectedToVisible.has(n.id);
+      });
+    }
+
     if (focusWallet) {
       const connectedIds = new Set<string>();
       connectedIds.add(focusWallet);
-      // Also keep center node
       if (centerAddr) connectedIds.add(centerAddr);
       for (const e of filteredEdges) {
         connectedIds.add(e.source as string);
@@ -900,19 +1145,17 @@ export default function BubbleMap({
       result = result.filter((n: any) => connectedIds.has(n.id));
     }
 
-    // Classification filter
     if (hasClassFilter) {
       result = result.filter((n: any) => {
         const cls = (n.data as any)?.classification;
-        if (cls === "center") return true; // always show center
+        if (cls === "center") return true;
         return classFilter.has(cls);
       });
     }
 
     return result;
-  }, [nodes, focusWallet, centerAddr, filteredEdges, hasClassFilter, classFilter]);
+  }, [nodes, focusWallet, centerAddr, filteredEdges, hasClassFilter, classFilter, hiddenNetworks, edges, edgeOriginMap, expandedAddresses]);
 
-  // Also re-filter edges to only include those with both endpoints visible
   const visibleEdges = useMemo(() => {
     const visibleIds = new Set(filteredNodes.map((n: any) => n.id));
     return filteredEdges.filter((e: any) => visibleIds.has(e.source as string) && visibleIds.has(e.target as string));
@@ -937,9 +1180,7 @@ export default function BubbleMap({
       {/* History panel (slide-out) */}
       {historyOpen && (
         <div className="fixed inset-0 z-[90] flex">
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40" onClick={() => setHistoryOpen(false)} />
-          {/* Panel */}
           <div className="relative ml-auto w-full sm:w-80 h-full bg-[#0a1018] border-l border-slate-700 overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-[#0a1018] border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
               <h2 className="text-sm font-bold uppercase tracking-widest text-slate-300">Tracking History</h2>
@@ -1027,6 +1268,33 @@ export default function BubbleMap({
         {error && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-500/20 border border-red-500/40 text-red-300 px-4 py-2 rounded-lg text-sm">
             {error}
+          </div>
+        )}
+
+        {/* Payment banner (compact, top-center) */}
+        {networkLocked && !loading && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-2">
+            <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-amber-500/40 rounded-xl shadow-2xl p-4 text-center">
+              <div className="text-amber-400 font-bold text-sm mb-1 tracking-wide uppercase">
+                Network Locked
+              </div>
+              <div className="text-slate-400 text-xs mb-3">
+                Pay 0.01 TON to unlock the network for<br />
+                <span className="font-mono text-slate-300">{shortAddr(activeAddress)}</span>
+              </div>
+              {paymentError && (
+                <div className="text-red-400 text-xs mb-2">{paymentError}</div>
+              )}
+              <button
+                onClick={handlePayForNetwork}
+                disabled={paymentPending}
+                className="w-full py-2.5 text-xs font-bold uppercase tracking-wide rounded-lg
+                           bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed
+                           text-black transition-all"
+              >
+                {paymentPending ? "Waiting for payment..." : "Pay 0.01 TON — Unlock Network"}
+              </button>
+            </div>
           </div>
         )}
 
@@ -1118,7 +1386,6 @@ export default function BubbleMap({
           {/* Filter panel */}
           <Panel position="top-right" style={{ marginTop: 8, marginRight: 8 }}>
             <div className="flex flex-col gap-2">
-              {/* Filter toggle button */}
               <button
                 onClick={() => setFilterOpen(o => !o)}
                 className={`flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-lg
@@ -1132,7 +1399,6 @@ export default function BubbleMap({
 
               {filterOpen && (
                 <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl p-3 w-[calc(100vw-24px)] sm:w-64 max-w-[280px] text-white">
-                  {/* Focus wallet dropdown */}
                   <div className="mb-3">
                     <label className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1 font-bold">
                       Focus on Wallet
@@ -1151,7 +1417,6 @@ export default function BubbleMap({
                     </select>
                   </div>
 
-                  {/* Classification filter */}
                   <div className="mb-3">
                     <label className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold">
                       Classification
@@ -1181,13 +1446,11 @@ export default function BubbleMap({
                     </div>
                   </div>
 
-                  {/* Stats */}
                   <div className="text-[10px] text-slate-400 mb-2">
                     Showing {filteredNodes.length} of {nodes.length} nodes
                     {" \u2022 "}{visibleEdges.length} of {edges.length} edges
                   </div>
 
-                  {/* Clear filters */}
                   {(focusWallet || hasClassFilter) && (
                     <button
                       onClick={clearFilters}
@@ -1227,11 +1490,15 @@ export default function BubbleMap({
         })() : null}
         centerAddress={centerAddr || userAddress || null}
         walletBalance={selected ? (walletBalances.get(selected.id) ?? null) : null}
-        onExpand={handleExpand}
-        onExpandClearAndFocus={handleExpandClearAndFocus}
-        onExpandKeepExisting={handleExpandKeepExisting}
+        network={currentNetwork}
+        userAddress={normalizedUserAddress || userAddress || ""}
+        onPaid={handleOnPaid}
         isExpanded={selected ? expandedAddresses.includes(selected.id) : false}
-        hasOtherExpansions={expandedAddresses.length > 1}
+        isHidden={selected ? hiddenNetworks.has(selected.id) : false}
+        canExpand={selected ? (pendingExpand.has(selected.id) && !expandedAddresses.includes(selected.id)) : false}
+        onExpand={handleExpand}
+        onHide={handleHide}
+        onShow={handleShow}
         cachedProfile={selected ? (profileCache.get(selected.id) ?? null) : null}
         onProfileFetched={handleProfileFetched}
       />
