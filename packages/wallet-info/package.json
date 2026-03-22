@@ -10,6 +10,12 @@
   ],
   "main": "wallet_info.js",
   "types": "wallet_info.d.ts",
+  "exports": {
+    ".": "./wallet_info.js",
+    "./wallet_info_bg.js": "./wallet_info_bg.js",
+    "./wallet_info_bg.wasm": "./wallet_info_bg.wasm",
+    "./package.json": "./package.json"
+  },
   "sideEffects": [
     "./wallet_info.js",
     "./snippets/*"
