@@ -196,7 +196,6 @@ export default function TransactionsTestPage() {
                 value={limit}
                 onChange={(e) => setLimit(Number(e.target.value))}
                 min={1}
-                max={10000}
               />
             </label>
 
