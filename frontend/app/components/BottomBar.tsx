@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { toPng } from "html-to-image";
 import { useTonAddress, useTonWallet, useTonConnectModal, useIsConnectionRestored } from "@tonconnect/ui-react";
+import { API_BASE } from "../utils/api";
 
 /* ── formatters ── */
 function fmtAddr(addr: string, long = false) {

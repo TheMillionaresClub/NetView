@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TopNavBar from "../../components/TopNavBar";
 import SideNavBar from "../../components/SideNavBar";
+import { API_BASE } from "../../utils/api";
 
 interface WalletInfo {
   address: string;

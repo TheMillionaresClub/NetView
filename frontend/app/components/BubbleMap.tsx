@@ -20,6 +20,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
+import { API_BASE } from "../utils/api";
 
 import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
 

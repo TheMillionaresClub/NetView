@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTonConnectUI } from "@tonconnect/ui-react";
+import { API_BASE } from "../utils/api";
 
 /* ════════════════════════════════════════════════════════
    TYPES

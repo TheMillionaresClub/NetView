@@ -3,6 +3,7 @@
 import { useState } from "react";
 import TopNavBar from "../../components/TopNavBar";
 import SideNavBar from "../../components/SideNavBar";
+import { API_BASE as API } from "../../utils/api";
 
 // ── Types matching the API response ──────────────────────────────
 interface Match {
