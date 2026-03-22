@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use futures::{future::join_all, join};
 use serde::{Deserialize, Serialize};
 
+use crate::decoder::normalize_address;
 use crate::network::Network;
 use crate::transactions::Transaction;
 use client::TonAnalysisClient;
@@ -41,6 +42,7 @@ pub async fn analyze_wallet(
     client: &TonAnalysisClient,
     address: &str,
 ) -> Result<WalletProfile> {
+    let address = &normalize_address(address);
     // ── Phase 1: everything that doesn't depend on transactions ──────────────
     let (states_res, info_res, jettons_res, nfts_res, dns_res, txs_res) = join!(
         api::get_wallet_states(client, address),

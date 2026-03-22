@@ -15,6 +15,7 @@ const { default: walletTransactionsRouter } = await import("./routes/wallet-tran
 const { default: traceLinkRouter } = await import("./routes/trace-link.js");
 const { default: walletAnalysisRouter } = await import("./routes/wallet-analysis.js");
 const { default: walletNetworkRouter } = await import("./routes/wallet-network.js");
+const { default: normalizeAddressRouter } = await import("./routes/normalize-address.js");
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -38,6 +39,7 @@ app.use("/api/wallet-transactions", walletTransactionsRouter);
 app.use("/api/trace-link", traceLinkRouter);
 app.use("/api/wallet-analysis", walletAnalysisRouter);
 app.use("/api/wallet-network", walletNetworkRouter);
+app.use("/api/normalize-address", normalizeAddressRouter);
 
 app.listen(PORT, () => {
     console.log(`Express API server running on http://localhost:${PORT}`);

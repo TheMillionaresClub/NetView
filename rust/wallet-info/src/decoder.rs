@@ -76,6 +76,29 @@ pub fn decode_ton_address(address_b64: &str) -> Result<Value, TonError> {
     }))
 }
 
+/// Normalize any user-friendly TON address to its canonical bounceable form.
+/// Non-bounceable (0Q…), bounceable (EQ…), and their testnet variants are all
+/// accepted. Returns the input unchanged if parsing fails so callers never
+/// lose an address due to an unexpected format.
+pub fn normalize_address(addr: &str) -> String {
+    let normalized = addr.replace('-', "+").replace('_', "/");
+    let padding = match normalized.len() % 4 {
+        0 => String::new(),
+        n => "=".repeat(4 - n),
+    };
+    let Ok(raw_bytes) = general_purpose::STANDARD.decode(format!("{normalized}{padding}")) else {
+        return addr.to_string();
+    };
+    if raw_bytes.len() != 36 {
+        return addr.to_string();
+    }
+    let workchain = raw_bytes[1] as i8 as i32;
+    let account   = hex::encode(&raw_bytes[2..34]);
+    // Always emit mainnet bounceable (EQ…) — the testnet flag is just a wallet
+    // hint, the on-chain account is the same regardless of the flag.
+    raw_to_friendly(workchain, &account, true, false).unwrap_or_else(|_| addr.to_string())
+}
+
 pub fn raw_to_friendly(
     workchain: i32,
     account_hex: &str,

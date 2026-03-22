@@ -19,6 +19,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow } from "./DetailPanel";
+import { normalizeToBounceable } from "../utils/ton";
 
 import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
 
@@ -440,16 +441,27 @@ export default function BubbleMap({
   const [walletBalances, setWalletBalances] = useState<Map<string, number>>(new Map());
   /** Track the current center address */
   const [centerAddr, setCenterAddr] = useState<string>("");
+  /** Cache of fetched WalletProfile results so re-opening a node doesn't lose data */
+  const [profileCache, setProfileCache] = useState<Map<string, WalletProfile>>(new Map());
+
+  const handleProfileFetched = useCallback((address: string, profile: WalletProfile) => {
+    setProfileCache(prev => new Map(prev).set(address, profile));
+  }, []);
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
-
-  // The active address is manual input first, then connected wallet
-  const activeAddress = manualAddress || userAddress || "";
+  const [activeAddress, setActiveAddress] = useState<string>("");
   // Track which address we last loaded so we can detect changes
   const lastLoadedRef = useRef<string>("");
+
+  // Normalize the raw address to canonical EQ form via the API
+  useEffect(() => {
+    const raw = manualAddress || userAddress || "";
+    if (!raw) { setActiveAddress(""); return; }
+    normalizeToBounceable(raw).then(setActiveAddress);
+  }, [manualAddress, userAddress]);
 
   const searchResults = knownWallets.filter((w) =>
     w.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -553,6 +565,9 @@ export default function BubbleMap({
       return;
     }
 
+    // Use the canonical address returned by the backend (always bounceable EQ… form)
+    const canonAddr = profile.address || address;
+
     const counterparties = aggregateTransactions(profile.recent_transactions);
 
     // Store balance data from interacted_wallets
@@ -563,13 +578,13 @@ export default function BubbleMap({
       }
       // Also store this wallet's own balance
       if (profile.state?.balance != null) {
-        next.set(address, profile.state.balance);
+        next.set(canonAddr, profile.state.balance);
       }
       return next;
     });
 
     if (isCenter) {
-      setCenterAddr(address);
+      setCenterAddr(canonAddr);
     }
 
     setNodes((prevNodes: any[]) => {
@@ -577,29 +592,29 @@ export default function BubbleMap({
       for (const n of prevNodes) nodeMap.set(n.id, n);
 
       // Ensure the center/expanded address node exists
-      if (!nodeMap.has(address)) {
+      if (!nodeMap.has(canonAddr)) {
         const totalTx = profile.recent_transactions.length;
-        nodeMap.set(address, {
-          id: address,
+        nodeMap.set(canonAddr, {
+          id: canonAddr,
           type: "person",
           position: { x: 0, y: 0 },
           data: {
-            label: isCenter ? "Center" : shortAddr(address),
+            label: isCenter ? "Center" : shortAddr(canonAddr),
             volumeTON: 0,
             radius: isCenter ? 55 : calcRadius(totalTx),
-            walletInfo: { id: address, label: isCenter ? "Center" : shortAddr(address), volumeTON: 0, txCount: totalTx, isCenter },
+            walletInfo: { id: canonAddr, label: isCenter ? "Center" : shortAddr(canonAddr), volumeTON: 0, txCount: totalTx, isCenter },
             classification: isCenter ? "center" : classifyByTxCount(totalTx),
             selected: false,
             onSelect: setSelected,
           },
         });
       } else {
-        const existing = nodeMap.get(address)!;
+        const existing = nodeMap.get(canonAddr)!;
         const oldTx = existing.data.walletInfo.txCount;
         const newTx = Math.max(oldTx, profile.recent_transactions.length);
         if (newTx > oldTx) {
           const wi = { ...existing.data.walletInfo, txCount: newTx };
-          nodeMap.set(address, {
+          nodeMap.set(canonAddr, {
             ...existing,
             data: {
               ...existing.data,
@@ -612,7 +627,7 @@ export default function BubbleMap({
       }
 
       // Get the orbit center position from the expanded node
-      const orbitNode = nodeMap.get(address);
+      const orbitNode = nodeMap.get(canonAddr);
       const cx = orbitNode?.position?.x ?? 0;
       const cy = orbitNode?.position?.y ?? 0;
       const radiusOrbit = 380;
@@ -680,7 +695,7 @@ export default function BubbleMap({
     });
 
     // Build and merge edges (deduped)
-    const newEdges = buildEdges(address, counterparties);
+    const newEdges = buildEdges(canonAddr, counterparties);
     setEdges((prevEdges: any[]) => {
       const existingIds = new Set(prevEdges.map((e: any) => e.id));
       const toAdd = newEdges.filter(e => !existingIds.has(e.id));
@@ -707,7 +722,7 @@ export default function BubbleMap({
       return next;
     });
 
-    setExpandedAddresses((prev) => [...prev, address]);
+    setExpandedAddresses((prev) => [...prev, canonAddr]);
     setLoading(false);
   }, [fetchFullAnalysis, buildEdges, setNodes, setEdges]);
 
@@ -902,6 +917,8 @@ export default function BubbleMap({
         walletBalance={selected ? (walletBalances.get(selected.id) ?? null) : null}
         onExpand={handleExpand}
         isExpanded={selected ? expandedAddresses.includes(selected.id) : false}
+        cachedProfile={selected ? (profileCache.get(selected.id) ?? null) : null}
+        onProfileFetched={handleProfileFetched}
       />
     </>
   );

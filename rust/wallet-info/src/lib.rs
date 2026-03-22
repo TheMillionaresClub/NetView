@@ -17,6 +17,13 @@ use crate::{
     types::fetch_address_balance,
 };
 
+/// Convert any user-friendly TON address (bounceable, non-bounceable, testnet)
+/// to its canonical bounceable form (EQ… for mainnet, kQ… for testnet).
+#[wasm_bindgen]
+pub fn normalize_address(address: String) -> String {
+    decoder::normalize_address(&address)
+}
+
 fn parse_network(s: Option<&str>) -> Network {
     match s {
         Some(n) if n.eq_ignore_ascii_case("mainnet") => Network::Mainnet,

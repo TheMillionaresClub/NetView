@@ -6,7 +6,10 @@ const manifestUrl ="https://gist.githubusercontent.com/theshadow76/69d6e474d2ed3
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <TonConnectUIProvider manifestUrl={manifestUrl}>
+    <TonConnectUIProvider
+      manifestUrl={manifestUrl}
+      actionsConfiguration={{ skipRedirectUrl: true }}
+    >
       {children}
     </TonConnectUIProvider>
   );

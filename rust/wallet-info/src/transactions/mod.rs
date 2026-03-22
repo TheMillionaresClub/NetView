@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::decoder::normalize_address;
 use crate::transactions::types::{ExtTransaction, RpcResponse};
 
 pub mod types;
@@ -35,7 +36,7 @@ pub fn extract_transactions_from_slice(ext_txs: &[ExtTransaction]) -> Vec<Transa
             // source is Some → another wallet sent us funds
             Some(msg) if msg.source.is_some() && msg.value > 0 => {
                 txs.push(Transaction {
-                    address:   msg.source.clone().unwrap(),
+                    address:   normalize_address(msg.source.as_deref().unwrap()),
                     action:    Action::Receive,
                     amount:    msg.value,
                     timestamp: ts,
@@ -48,7 +49,7 @@ pub fn extract_transactions_from_slice(ext_txs: &[ExtTransaction]) -> Vec<Transa
                 for out in &ext_tx.out_msgs {
                     if out.value > 0 {
                         txs.push(Transaction {
-                            address:   out.destination.clone(),
+                            address:   normalize_address(&out.destination),
                             action:    Action::Send,
                             amount:    out.value,
                             timestamp: ts,
