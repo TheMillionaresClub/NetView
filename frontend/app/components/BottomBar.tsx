@@ -192,6 +192,7 @@ export default function BottomBar() {
       <div style={{ height: 2, background: `linear-gradient(90deg, ${networkColor} 0%, transparent 60%)`, flexShrink: 0 }} />
 
       {/* header strip */}
+      {!collapsed && (<>
       <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-2.5 border-b border-[#1c2d42] shrink-0 gap-2 min-w-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
           {/* wallet avatar — hidden on mobile to save space */}
@@ -366,6 +367,7 @@ export default function BottomBar() {
         </div>
 
       </div>
+      </>)}
     </footer>
   );
 }
