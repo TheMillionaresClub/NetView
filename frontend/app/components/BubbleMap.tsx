@@ -523,6 +523,9 @@ export default function BubbleMap({
     setWalletBalances(new Map());
     setCenterAddr("");
     setError(null);
+    setEdgeOriginMap(new Map());
+    setFocusWallet(null);
+    setClassFilter(new Set());
     localStorage.removeItem(LS_KEY);
   }, [setNodes, setEdges]);
 
@@ -900,15 +903,20 @@ export default function BubbleMap({
         )}
 
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={filteredNodes}
+          edges={visibleEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={(_, node) => {
             const wi = (node.data as any).walletInfo as WalletInfo;
-            if (wi) handleSelectNode(wi);
+            if (!wi) return;
+            handleSelectNode(wi);
+            // Auto-expand on click if not yet expanded
+            if (!expandedAddresses.includes(wi.id) && wi.id !== "placeholder") {
+              handleExpand(wi.id);
+            }
           }}
           onPaneClick={() => setSelected(null)}
           fitView
@@ -930,6 +938,94 @@ export default function BubbleMap({
             >
               &#x2728; Realign
             </button>
+          </Panel>
+
+          {/* Filter panel */}
+          <Panel position="top-right" style={{ marginTop: 8, marginRight: 8 }}>
+            <div className="flex flex-col gap-2">
+              {/* Filter toggle button */}
+              <button
+                onClick={() => setFilterOpen(o => !o)}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide rounded-lg
+                           transition-all cursor-pointer backdrop-blur-sm shadow-lg border
+                           ${(focusWallet || hasClassFilter)
+                             ? "bg-orange-600/90 border-orange-400/50 text-white"
+                             : "bg-slate-700/90 border-slate-500/50 text-slate-200 hover:bg-slate-600"}`}
+              >
+                &#x1F50D; Filter {(focusWallet || hasClassFilter) ? "(active)" : ""}
+              </button>
+
+              {filterOpen && (
+                <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl p-3 w-64 text-white">
+                  {/* Focus wallet dropdown */}
+                  <div className="mb-3">
+                    <label className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1 font-bold">
+                      Focus on Wallet
+                    </label>
+                    <select
+                      value={focusWallet ?? "__all__"}
+                      onChange={(e) => setFocusWallet(e.target.value === "__all__" ? null : e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-white focus:border-blue-400 outline-none"
+                    >
+                      <option value="__all__">All wallets</option>
+                      {expandedAddresses.map((addr) => (
+                        <option key={addr} value={addr}>
+                          {addr === centerAddr ? "Center" : shortAddr(addr)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Classification filter */}
+                  <div className="mb-3">
+                    <label className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold">
+                      Classification
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ALL_CLASSES.map((cls) => {
+                        const isActive = !hasClassFilter || classFilter.has(cls);
+                        const colors: Record<string, string> = {
+                          whale: "bg-purple-600/80 border-purple-400",
+                          trader: "bg-blue-600/80 border-blue-400",
+                          degen: "bg-green-600/80 border-green-400",
+                          investor: "bg-cyan-600/80 border-cyan-400",
+                        };
+                        return (
+                          <button
+                            key={cls}
+                            onClick={() => toggleClassFilter(cls)}
+                            className={`px-2 py-1 text-[10px] font-bold uppercase rounded border transition-all
+                              ${isActive
+                                ? `${colors[cls]} text-white`
+                                : "bg-slate-800/50 border-slate-600 text-slate-500"}`}
+                          >
+                            {cls}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="text-[10px] text-slate-400 mb-2">
+                    Showing {filteredNodes.length} of {nodes.length} nodes
+                    {" \u2022 "}{visibleEdges.length} of {edges.length} edges
+                  </div>
+
+                  {/* Clear filters */}
+                  {(focusWallet || hasClassFilter) && (
+                    <button
+                      onClick={clearFilters}
+                      className="w-full py-1.5 text-[10px] font-bold uppercase tracking-wide rounded
+                                 bg-red-600/30 border border-red-500/40 text-red-300
+                                 hover:bg-red-600/50 transition-all"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </Panel>
         </ReactFlow>
       </main>
