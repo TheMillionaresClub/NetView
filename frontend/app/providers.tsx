@@ -1,50 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 /**
- * Serve the TonConnect manifest from our own API route so the `url` field
- * always matches the current app origin (works with localhost, ngrok, prod).
- *
- * IMPORTANT: We must NOT use `key={manifestUrl}` on the provider.
- * Changing the key destroys and recreates the TonConnectUIProvider,
- * which kills the active bridge session.  On desktop this is tolerable
- * (the QR-code flow is bridge-resilient), but on mobile the wallet has
- * already opened via deep-link and is talking to the OLD bridge — the
- * connection silently fails.
- *
- * Instead we compute the manifest URL once (synchronously where possible)
- * and only fall back to the Gist URL during SSR.
+ * Publicly-reachable manifest — the wallet fetches this **server-side** so it
+ * must NOT point at localhost or a Next.js API route.  The static Gist works
+ * from every context (desktop, mobile browser, Telegram Mini App).
  */
-const GIST_FALLBACK =
+const MANIFEST_URL =
   "https://gist.githubusercontent.com/theshadow76/69d6e474d2ed3906cfd92f2408da6781/raw/tonconnect-manifest.json";
 
-function getInitialManifestUrl(): string {
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/api/tonconnect-manifest`;
+/** Detect Telegram Mini App context (window.Telegram.WebApp). */
+function isTMA(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return !!((window as any).Telegram?.WebApp?.initData);
+  } catch {
+    return false;
   }
-  return GIST_FALLBACK;
 }
 
-export default function Providers({ children }: { children: React.ReactNode }) {
-  // Stable manifest URL — computed once, never causes a provider remount.
-  const manifestUrl = useMemo(getInitialManifestUrl, []);
+// ── Provider ──────────────────────────────────────────────────────────────────
 
-  // actionsConfiguration tells the mobile wallet how to return to the app
-  // after the user approves the connection / transaction.
-  const actionsConfiguration = useMemo(
-    () => ({
-      returnStrategy: (typeof window !== "undefined"
-        ? window.location.origin
-        : "back") as "back" | `${string}://${string}`,
-    }),
-    [],
-  );
+export default function Providers({ children }: { children: React.ReactNode }) {
+  const actionsConfiguration = useMemo(() => {
+    if (isTMA()) {
+      // Inside Telegram: no redirect URL — just bring the mini-app back.
+      return {
+        twaReturnUrl: window.location.href as `${string}://${string}`,
+        returnStrategy: "back" as const,
+      };
+    }
+    // Normal browser (desktop / mobile Safari / Chrome).
+    return {
+      returnStrategy: "back" as const,
+    };
+  }, []);
 
   return (
     <TonConnectUIProvider
-      manifestUrl={manifestUrl}
+      manifestUrl={MANIFEST_URL}
       actionsConfiguration={actionsConfiguration}
     >
       {children}
