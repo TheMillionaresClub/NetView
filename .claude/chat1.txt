@@ -2,9 +2,9 @@
 │                                                 │ Tips for getting started   │
 │              Welcome back Antoine!              │ Run /init to create a CLA… │
 │                                                 │ ────────────────────────── │
-│                     ▐▛███▜▌                   │ Recent activity            │
-│                    ▝▜█████▛▘                 │ No recent activity         │
-│                      ▘▘ ▝▝                   │                            │
+│                       ▐▛███▜▌                 │ Recent activity            │
+│                     ▝▜█████▛▘                │ No recent activity         │
+│                        ▘▘▝▝                  │                            │
 │                                                 │                            │
 │   Sonnet 4.6 · Claude Team · Alphaton Capital   │                            │
 │       ~/Documents/Github/Perso/motivaton        │                            │
