@@ -79,6 +79,8 @@ interface Props {
   walletBalance: number | null;
   onExpand: (address: string) => void;
   isExpanded: boolean;
+  cachedProfile?: WalletProfile | null;
+  onProfileFetched?: (address: string, profile: WalletProfile) => void;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -150,9 +152,9 @@ function tokenColor(sym: string): string {
 /* ════════════════════════════════════════════════════════
    COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function DetailPanel({ wallet, onClose, flow, centerAddress, walletBalance, onExpand, isExpanded }: Props) {
+export default function DetailPanel({ wallet, onClose, flow, centerAddress, walletBalance, onExpand, isExpanded, cachedProfile, onProfileFetched }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [profile, setProfile] = useState<WalletProfile | null>(null);
+  const [profile, setProfile] = useState<WalletProfile | null>(cachedProfile ?? null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
@@ -168,6 +170,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
       const data = await res.json();
       if (data.ok) {
         setProfile(data.result);
+        onProfileFetched?.(address, data.result);
       } else {
         throw new Error(data.error ?? "Unknown error");
       }
@@ -176,7 +179,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
     } finally {
       setLoadingProfile(false);
     }
-  }, []);
+  }, [onProfileFetched]);
 
   /* Handle "Full Analysis" button: direct fetch (no payment for testing) */
   const handleFullAnalysis = useCallback(async () => {
@@ -185,11 +188,11 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
     await fetchFullAnalysis(wallet.id);
   }, [wallet, profile, fetchFullAnalysis]);
 
-  /* Reset profile when wallet changes */
+  /* When wallet changes, restore from cache or clear */
   useEffect(() => {
-    setProfile(null);
+    setProfile(cachedProfile ?? null);
     setProfileError(null);
-  }, [wallet?.id]);
+  }, [wallet?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Click outside / Escape to close */
   useEffect(() => {

@@ -19,6 +19,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow } from "./DetailPanel";
+import { normalizeToBounceable } from "../utils/ton";
 
 import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
 
@@ -38,26 +39,6 @@ export interface NetworkResult {
   balanceNano: number | null;
   totalTxFetched: number;
   counterparties: Counterparty[];
-}
-
-interface RustTransaction {
-  address: string;
-  action: string;
-  amount: number;
-  timestamp: number;
-  fee: number;
-}
-
-interface WalletProfile {
-  address: string;
-  state: { address: string; balance: number; status: string; wallet_type: string | null; seqno: number | null; is_wallet: boolean } | null;
-  info: { wallet_type: string | null; seqno: number | null; account_state: string } | null;
-  jettons: any[];
-  nfts: any[];
-  dns_names: any[];
-  recent_transactions: RustTransaction[];
-  interacted_wallets: Record<string, string>;
-  classification: { kind: string; confidence: number; signals: string[] };
 }
 
 export interface WalletInfo {
@@ -96,24 +77,6 @@ function edgeKey(a: string, b: string) {
   return a < b ? `edge-${a}-${b}` : `edge-${b}-${a}`;
 }
 
-/** Aggregate recent_transactions into Counterparty[] */
-function aggregateTransactions(txs: RustTransaction[]): Counterparty[] {
-  const map = new Map<string, Counterparty>();
-  for (const tx of txs) {
-    if (!map.has(tx.address)) {
-      map.set(tx.address, { address: tx.address, sentNano: 0, receivedNano: 0, txCount: 0, lastSeen: tx.timestamp });
-    }
-    const cp = map.get(tx.address)!;
-    cp.txCount++;
-    cp.lastSeen = Math.max(cp.lastSeen, tx.timestamp);
-    if (tx.action === "Send") {
-      cp.sentNano += tx.amount;
-    } else {
-      cp.receivedNano += tx.amount;
-    }
-  }
-  return Array.from(map.values());
-}
 
 const THEMES: Record<string, { ring: string; glow: string; bg: string }> = {
   center:   { ring: "border-orange-400", glow: "shadow-[0_0_22px_rgba(249,115,22,.45)]",  bg: "bg-orange-900/60"  },
@@ -440,32 +403,48 @@ export default function BubbleMap({
   const [walletBalances, setWalletBalances] = useState<Map<string, number>>(new Map());
   /** Track the current center address */
   const [centerAddr, setCenterAddr] = useState<string>("");
+  /** Cache of fetched WalletProfile results so re-opening a node doesn't lose data */
+  const [profileCache, setProfileCache] = useState<Map<string, WalletProfile>>(new Map());
+
+  const handleProfileFetched = useCallback((address: string, profile: WalletProfile) => {
+    setProfileCache(prev => new Map(prev).set(address, profile));
+  }, []);
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
-
-  // The active address is manual input first, then connected wallet
-  const activeAddress = manualAddress || userAddress || "";
+  const [activeAddress, setActiveAddress] = useState<string>("");
   // Track which address we last loaded so we can detect changes
   const lastLoadedRef = useRef<string>("");
+
+  // Normalize the raw address to canonical EQ form via the API
+  useEffect(() => {
+    const raw = manualAddress || userAddress || "";
+    if (!raw) { setActiveAddress(""); return; }
+    normalizeToBounceable(raw).then(setActiveAddress);
+  }, [manualAddress, userAddress]);
 
   const searchResults = knownWallets.filter((w) =>
     w.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  /* -- Fetch full analysis from API -- */
-  const fetchFullAnalysis = useCallback(async (address: string): Promise<WalletProfile | null> => {
+  /* -- Fetch network graph from API -- */
+  const fetchFullAnalysis = useCallback(async (address: string): Promise<{ counterparties: Counterparty[]; totalTxFetched: number; balanceNano: number | null } | null> => {
     try {
       const res = await fetch(
-        `http://localhost:3001/api/wallet-analysis/full?address=${encodeURIComponent(address)}&network=testnet`
+        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`
       );
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "Unknown error");
-      return json.result as WalletProfile;
+      const r = json.result;
+      return {
+        counterparties: r.counterparties ?? [],
+        totalTxFetched: r.totalTxFetched ?? 0,
+        balanceNano: r.balanceNano ?? null,
+      };
     } catch (err) {
       console.error("fetchFullAnalysis error:", err);
       return null;
@@ -553,23 +532,20 @@ export default function BubbleMap({
       return;
     }
 
-    const counterparties = aggregateTransactions(profile.recent_transactions);
+    const canonAddr = address;
+    const counterparties = profile.counterparties;
 
-    // Store balance data from interacted_wallets
+    // Store balance for the center wallet
     setWalletBalances((prev) => {
       const next = new Map(prev);
-      for (const [addr, bal] of Object.entries(profile.interacted_wallets)) {
-        next.set(addr, Number(bal));
-      }
-      // Also store this wallet's own balance
-      if (profile.state?.balance != null) {
-        next.set(address, profile.state.balance);
+      if (profile.balanceNano != null) {
+        next.set(canonAddr, profile.balanceNano);
       }
       return next;
     });
 
     if (isCenter) {
-      setCenterAddr(address);
+      setCenterAddr(canonAddr);
     }
 
     setNodes((prevNodes: any[]) => {
@@ -577,29 +553,29 @@ export default function BubbleMap({
       for (const n of prevNodes) nodeMap.set(n.id, n);
 
       // Ensure the center/expanded address node exists
-      if (!nodeMap.has(address)) {
-        const totalTx = profile.recent_transactions.length;
-        nodeMap.set(address, {
-          id: address,
+      if (!nodeMap.has(canonAddr)) {
+        const totalTx = profile.totalTxFetched;
+        nodeMap.set(canonAddr, {
+          id: canonAddr,
           type: "person",
           position: { x: 0, y: 0 },
           data: {
-            label: isCenter ? "Center" : shortAddr(address),
+            label: isCenter ? "Center" : shortAddr(canonAddr),
             volumeTON: 0,
             radius: isCenter ? 55 : calcRadius(totalTx),
-            walletInfo: { id: address, label: isCenter ? "Center" : shortAddr(address), volumeTON: 0, txCount: totalTx, isCenter },
+            walletInfo: { id: canonAddr, label: isCenter ? "Center" : shortAddr(canonAddr), volumeTON: 0, txCount: totalTx, isCenter },
             classification: isCenter ? "center" : classifyByTxCount(totalTx),
             selected: false,
             onSelect: setSelected,
           },
         });
       } else {
-        const existing = nodeMap.get(address)!;
+        const existing = nodeMap.get(canonAddr)!;
         const oldTx = existing.data.walletInfo.txCount;
-        const newTx = Math.max(oldTx, profile.recent_transactions.length);
+        const newTx = Math.max(oldTx, profile.totalTxFetched);
         if (newTx > oldTx) {
           const wi = { ...existing.data.walletInfo, txCount: newTx };
-          nodeMap.set(address, {
+          nodeMap.set(canonAddr, {
             ...existing,
             data: {
               ...existing.data,
@@ -612,7 +588,7 @@ export default function BubbleMap({
       }
 
       // Get the orbit center position from the expanded node
-      const orbitNode = nodeMap.get(address);
+      const orbitNode = nodeMap.get(canonAddr);
       const cx = orbitNode?.position?.x ?? 0;
       const cy = orbitNode?.position?.y ?? 0;
       const radiusOrbit = 380;
@@ -680,7 +656,7 @@ export default function BubbleMap({
     });
 
     // Build and merge edges (deduped)
-    const newEdges = buildEdges(address, counterparties);
+    const newEdges = buildEdges(canonAddr, counterparties);
     setEdges((prevEdges: any[]) => {
       const existingIds = new Set(prevEdges.map((e: any) => e.id));
       const toAdd = newEdges.filter(e => !existingIds.has(e.id));
@@ -707,7 +683,7 @@ export default function BubbleMap({
       return next;
     });
 
-    setExpandedAddresses((prev) => [...prev, address]);
+    setExpandedAddresses((prev) => [...prev, canonAddr]);
     setLoading(false);
   }, [fetchFullAnalysis, buildEdges, setNodes, setEdges]);
 
@@ -902,6 +878,8 @@ export default function BubbleMap({
         walletBalance={selected ? (walletBalances.get(selected.id) ?? null) : null}
         onExpand={handleExpand}
         isExpanded={selected ? expandedAddresses.includes(selected.id) : false}
+        cachedProfile={selected ? (profileCache.get(selected.id) ?? null) : null}
+        onProfileFetched={handleProfileFetched}
       />
     </>
   );

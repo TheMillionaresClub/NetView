@@ -25,3 +25,9 @@ export function get_address_information(address: string): Promise<string>;
  * response there are no more pages.
  */
 export function get_transactions(address: string, limit: number, lt?: string | null, hash?: string | null, api_key?: string | null): Promise<any>;
+
+/**
+ * Convert any user-friendly TON address (bounceable, non-bounceable, testnet)
+ * to its canonical bounceable form (EQ… for mainnet, kQ… for testnet).
+ */
+export function normalize_address(address: string): string;

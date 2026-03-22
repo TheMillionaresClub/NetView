@@ -74,6 +74,27 @@ export function get_transactions(address, limit, lt, hash, api_key) {
     const ret = wasm.get_transactions(ptr0, len0, limit, ptr1, len1, ptr2, len2, ptr3, len3);
     return ret;
 }
+
+/**
+ * Convert any user-friendly TON address (bounceable, non-bounceable, testnet)
+ * to its canonical bounceable form (EQ… for mainnet, kQ… for testnet).
+ * @param {string} address
+ * @returns {string}
+ */
+export function normalize_address(address) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.normalize_address(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
 export function __wbg_Error_83742b46f01ce22d(arg0, arg1) {
     const ret = Error(getStringFromWasm0(arg0, arg1));
     return ret;
@@ -314,7 +335,7 @@ export function __wbg_value_21fc78aab0322612(arg0) {
     return ret;
 }
 export function __wbindgen_cast_0000000000000001(arg0, arg1) {
-    // Cast intrinsic for `Closure(Closure { dtor_idx: 198, function: Function { arguments: [Externref], shim_idx: 199, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+    // Cast intrinsic for `Closure(Closure { dtor_idx: 199, function: Function { arguments: [Externref], shim_idx: 200, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
     const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__ha6766aa722118a08, wasm_bindgen__convert__closures_____invoke__h80556c7c89519524);
     return ret;
 }
