@@ -103,7 +103,7 @@ type NodeData = {
 };
 
 const PersonNode = ({ data }: { data: NodeData }) => {
-  const { radius, walletInfo, classification, selected, onSelect } = data;
+  const { radius, walletInfo, classification, selected, isExpanded, onSelect } = data;
   const t = theme(classification);
   const isCenter = walletInfo.isCenter;
 
@@ -131,6 +131,18 @@ const PersonNode = ({ data }: { data: NodeData }) => {
       {!isCenter && (
         <span className="text-[10px] opacity-75 font-mono mt-0.5 tracking-wide">
           {walletInfo.txCount} tx{walletInfo.txCount !== 1 ? "s" : ""}
+        </span>
+      )}
+
+      {/* Expand indicator */}
+      {!isCenter && !isExpanded && (
+        <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] bg-blue-500/80 text-white px-1.5 py-0.5 rounded-t font-bold tracking-wide leading-none">
+          +
+        </span>
+      )}
+      {!isCenter && isExpanded && (
+        <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] bg-green-500/80 text-white px-1.5 py-0.5 rounded-t font-bold tracking-wide leading-none">
+          &#x2713;
         </span>
       )}
 
@@ -755,15 +767,20 @@ export default function BubbleMap({
     handleSelectNode(wallet);
   }, [setSearchTerm, handleSelectNode]);
 
-  /* -- Update selected state on nodes -- */
+  /* -- Update selected & expanded state on nodes -- */
   useEffect(() => {
     setNodes((nds: any[]) =>
       nds.map((n: any) => ({
         ...n,
-        data: { ...n.data, selected: selected?.id === n.id, onSelect: (w: WalletInfo) => setSelected(w) },
+        data: {
+          ...n.data,
+          selected: selected?.id === n.id,
+          isExpanded: expandedAddresses.includes(n.id),
+          onSelect: (w: WalletInfo) => setSelected(w),
+        },
       }))
     );
-  }, [selected, setNodes]);
+  }, [selected, expandedAddresses, setNodes]);
 
   /* -- Force layout: realign nodes to avoid overlap -- */
   const handleRealign = useCallback(() => {
