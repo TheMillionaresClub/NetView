@@ -21,7 +21,7 @@ import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
 
-import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
+import { useTonConnectUI, useTonAddress, useTonWallet, useTonConnectModal } from "@tonconnect/ui-react";
 
 /* ================================================================
    TYPES
@@ -1282,6 +1282,28 @@ const searchResults = knownWallets.filter((w) =>
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm text-slate-300">Fetching on-chain data...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Connect Wallet popup */}
+        {!userAddress && !manualAddress && !loading && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center">
+            <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
+                <span className="text-3xl">&#x1F4B0;</span>
+              </div>
+              <h2 className="text-lg font-bold text-white mb-2">Connect Your Wallet</h2>
+              <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+                Connect your TON wallet to explore your on-chain network, or enter an address manually above.
+              </p>
+              <button
+                onClick={() => tonConnectUI.openModal()}
+                className="w-full bg-[#00E5FF] text-[#0B0E11] px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-lg
+                           hover:brightness-110 active:scale-95 transition-all"
+              >
+                Connect Wallet
+              </button>
             </div>
           </div>
         )}
