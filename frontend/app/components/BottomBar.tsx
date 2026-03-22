@@ -31,6 +31,7 @@ interface OnChainStats {
 export default function BottomBar() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   const restored   = useIsConnectionRestored();
   const address    = useTonAddress(true);   // user-friendly (EQ…)
@@ -138,8 +139,17 @@ export default function BottomBar() {
   /* ── not connected ── */
   if (!restored || !connected) {
     return (
-      <footer style={{ height: "42vh" }} className="fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42]">
+      <footer style={{ height: collapsed ? "auto" : "42vh" }} className="fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42] transition-all duration-300">
+        {/* collapse toggle */}
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          className="absolute -top-7 left-1/2 -translate-x-1/2 z-10 bg-[#0a1018] border border-b-0 border-[#1c2d42] rounded-t-lg px-4 py-1 text-[#4a6080] hover:text-white transition-colors"
+          title={collapsed ? "Expand panel" : "Collapse panel"}
+        >
+          <span className="material-symbols-outlined text-sm" style={{ display: "block", transform: collapsed ? "rotate(180deg)" : "none", transition: "transform 0.3s" }}>expand_more</span>
+        </button>
         <div style={{ height: 2, background: "linear-gradient(90deg, #1c2d42 0%, transparent 60%)", flexShrink: 0 }} />
+        {collapsed ? null : (
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           {!restored ? (
             <span className="font-mono text-[11px] text-[#4a6080] uppercase tracking-widest animate-pulse">
@@ -161,13 +171,22 @@ export default function BottomBar() {
             </>
           )}
         </div>
+        )}
       </footer>
     );
   }
 
   /* ── connected ── */
   return (
-    <footer style={{ height: "42vh" }} className="fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42]">
+    <footer style={{ height: collapsed ? "auto" : "42vh" }} className="fixed bottom-0 left-0 sm:left-20 right-0 w-auto z-50 flex flex-col bg-[#0a1018] border-t border-[#1c2d42] transition-all duration-300">
+      {/* collapse toggle */}
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        className="absolute -top-7 left-1/2 -translate-x-1/2 z-10 bg-[#0a1018] border border-b-0 border-[#1c2d42] rounded-t-lg px-4 py-1 text-[#4a6080] hover:text-white transition-colors"
+        title={collapsed ? "Expand panel" : "Collapse panel"}
+      >
+        <span className="material-symbols-outlined text-sm" style={{ display: "block", transform: collapsed ? "rotate(180deg)" : "none", transition: "transform 0.3s" }}>expand_more</span>
+      </button>
 
       {/* accent line */}
       <div style={{ height: 2, background: `linear-gradient(90deg, ${networkColor} 0%, transparent 60%)`, flexShrink: 0 }} />
