@@ -11,7 +11,7 @@ export function webToExpress(handler: WebHandler) {
         try {
             // Build a Web Request from Express req
             const protocol = req.protocol;
-            const host = req.get("host") ?? "localhost:3001";
+            const host = req.get("host") ?? "https://ayesha-acrotic-gingerly.ngrok-free.dev";
             const url = `${protocol}://${host}${req.originalUrl}`;
 
             const headers = new Headers();

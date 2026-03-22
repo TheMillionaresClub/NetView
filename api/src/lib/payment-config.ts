@@ -19,7 +19,7 @@ export function getPaymentConfig(
         facilitatorUrl:
             overrides?.facilitatorUrl ??
             process.env.FACILITATOR_URL ??
-            "http://localhost:3001/api/facilitator",
+            "https://ayesha-acrotic-gingerly.ngrok-free.dev/api/facilitator",
         description: overrides?.description,
         decimals: overrides?.decimals,
     };
