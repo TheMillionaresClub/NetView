@@ -173,7 +173,7 @@ PORT=3001
 Create a `.env.local` file in the `frontend/` folder:
 
 ```env
-NEXT_PUBLIC_APP_URL=http://localhost:3001
+NEXT_PUBLIC_APP_URL=https://ayesha-acrotic-gingerly.ngrok-free.dev
 ```
 
 **5. Start the development servers**
@@ -273,7 +273,7 @@ NetView/
 
 ## API Reference
 
-All endpoints are served from the API server (default: `http://localhost:3001`).
+All endpoints are served from the API server (default: `https://ayesha-acrotic-gingerly.ngrok-free.dev`).
 
 ### Wallet Information
 
