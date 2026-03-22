@@ -59,7 +59,7 @@ interface Classification {
   signals: string[];
 }
 
-interface WalletProfile {
+export interface WalletProfile {
   address: string;
   state: { address: string; balance: number; status: string; wallet_type: string | null; seqno: number | null; is_wallet: boolean } | null;
   info: { wallet_type: string | null; seqno: number | null; account_state: string } | null;

@@ -18,7 +18,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import DetailPanel, { type CounterpartyFlow } from "./DetailPanel";
+import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
 
 import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
@@ -410,6 +410,15 @@ export default function BubbleMap({
     setProfileCache(prev => new Map(prev).set(address, profile));
   }, []);
 
+  /** Track which expanded wallet originated each edge: edgeId -> originAddr */
+  const [edgeOriginMap, setEdgeOriginMap] = useState<Map<string, string>>(new Map());
+  /** Filter: focus on a single expanded wallet's sub-network (null = show all) */
+  const [focusWallet, setFocusWallet] = useState<string | null>(null);
+  /** Filter: which classifications are visible (empty = all visible) */
+  const [classFilter, setClassFilter] = useState<Set<string>>(new Set());
+  /** Filter panel open/close */
+  const [filterOpen, setFilterOpen] = useState(false);
+
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
   const [tonConnectUI] = useTonConnectUI();
@@ -483,7 +492,7 @@ export default function BubbleMap({
         type: 'circle',
         animated: true,
         label,
-        data: { txCount: cp.txCount, volumeTON: nanoToTON(cp.sentNano + cp.receivedNano) },
+        data: { txCount: cp.txCount, volumeTON: nanoToTON(cp.sentNano + cp.receivedNano), origin: originAddr },
         style: { stroke: color, strokeWidth: 2.5 },
         markerEnd: {
           type: MarkerType.Arrow,
@@ -663,6 +672,13 @@ export default function BubbleMap({
       return [...prevEdges, ...toAdd];
     });
 
+    // Track which expanded wallet originated each edge
+    setEdgeOriginMap((prev) => {
+      const next = new Map(prev);
+      for (const e of newEdges) next.set(e.id, canonAddr);
+      return next;
+    });
+
     // Store counterparty flow data
     setCounterpartyMap((prev) => {
       const next = new Map(prev);
@@ -759,6 +775,70 @@ export default function BubbleMap({
       saveToStorage(nodes, edges, activeAddress, expandedAddresses);
     }
   }, [nodes, edges, expandedAddresses, activeAddress]);
+
+  /* -- Computed: filtered nodes & edges -- */
+  const ALL_CLASSES = ["whale", "trader", "degen", "investor"];
+  const hasClassFilter = classFilter.size > 0;
+
+  const filteredEdges = useMemo(() => {
+    let result = edges;
+    // Focus filter: show only edges from this expanded wallet
+    if (focusWallet) {
+      result = result.filter((e: any) => {
+        const origin = edgeOriginMap.get(e.id) ?? (e.data as any)?.origin;
+        return origin === focusWallet;
+      });
+    }
+    return result;
+  }, [edges, focusWallet, edgeOriginMap]);
+
+  const filteredNodes = useMemo(() => {
+    let result = nodes;
+
+    // Focus filter: show only center node + the focused wallet + its connected counterparties
+    if (focusWallet) {
+      const connectedIds = new Set<string>();
+      connectedIds.add(focusWallet);
+      // Also keep center node
+      if (centerAddr) connectedIds.add(centerAddr);
+      for (const e of filteredEdges) {
+        connectedIds.add(e.source as string);
+        connectedIds.add(e.target as string);
+      }
+      result = result.filter((n: any) => connectedIds.has(n.id));
+    }
+
+    // Classification filter
+    if (hasClassFilter) {
+      result = result.filter((n: any) => {
+        const cls = (n.data as any)?.classification;
+        if (cls === "center") return true; // always show center
+        return classFilter.has(cls);
+      });
+    }
+
+    return result;
+  }, [nodes, focusWallet, centerAddr, filteredEdges, hasClassFilter, classFilter]);
+
+  // Also re-filter edges to only include those with both endpoints visible
+  const visibleEdges = useMemo(() => {
+    const visibleIds = new Set(filteredNodes.map((n: any) => n.id));
+    return filteredEdges.filter((e: any) => visibleIds.has(e.source as string) && visibleIds.has(e.target as string));
+  }, [filteredNodes, filteredEdges]);
+
+  const toggleClassFilter = useCallback((cls: string) => {
+    setClassFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(cls)) next.delete(cls);
+      else next.add(cls);
+      return next;
+    });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFocusWallet(null);
+    setClassFilter(new Set());
+  }, []);
 
   return (
     <>
