@@ -2,8 +2,8 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const normalize_address: (a: number, b: number) => [number, number];
-export const get_address_information: (a: number, b: number, c: number, d: number) => any;
-export const get_transactions: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => any;
+export const get_address_information: (a: number, b: number) => any;
+export const get_transactions: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => any;
 export const analyze_wallet: (a: number, b: number, c: number, d: number, e: number, f: number) => any;
 export const full_analysis: (a: number, b: number, c: number, d: number, e: number, f: number) => any;
 export const wasm_bindgen__closure__destroy__ha6766aa722118a08: (a: number, b: number) => void;

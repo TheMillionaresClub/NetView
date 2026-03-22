@@ -33,22 +33,12 @@ export default function BottomBar() {
   const [done, setDone] = useState(false);
   const [collapsed, setCollapsed] = useState(typeof window !== 'undefined' && window.innerWidth < 640);
 
-  const sdkRestored = useIsConnectionRestored();
+  const restored   = useIsConnectionRestored();
   const address    = useTonAddress(true);   // user-friendly (EQ…)
   const rawAddress = useTonAddress(false);
   const wallet     = useTonWallet();
   const { open }   = useTonConnectModal();
   const connected  = !!rawAddress;
-
-  // Timeout fallback: in Telegram‟s WebView the SDK bridge restore can
-  // hang indefinitely. After 3 s we force the UI to show the connect button.
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    if (sdkRestored) return;
-    const id = setTimeout(() => setTimedOut(true), 3000);
-    return () => clearTimeout(id);
-  }, [sdkRestored]);
-  const restored = sdkRestored || timedOut;
 
   /* chain: "-239" = mainnet, "-3" = testnet */
   const chain      = wallet?.account?.chain;
@@ -71,7 +61,7 @@ export default function BottomBar() {
       setStatsLoading(true);
       try {
         const res = await fetch(
-          `/api/wallet-network?address=${encodeURIComponent(rawAddress)}&limit=50`
+          `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(rawAddress)}&limit=50`
         );
         if (!res.ok) throw new Error("API " + res.status);
         const json = await res.json();
@@ -173,7 +163,6 @@ export default function BottomBar() {
               </p>
               <button
                 onClick={() => open()}
-                style={{ touchAction: "manipulation" }}
                 className="bg-[#00E5FF] text-[#0B0E11] px-6 py-2 text-[10px] font-headline font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm">account_balance_wallet</span>

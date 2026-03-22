@@ -21,7 +21,7 @@ import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
 
-import { useTonConnectUI, useTonAddress, useTonWallet, useTonConnectModal, useIsConnectionRestored, CHAIN } from "@tonconnect/ui-react";
+import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
 
 /* ================================================================
    TYPES
@@ -451,13 +451,11 @@ export default function BubbleMap({
   setSearchTerm,
   manualAddress,
   setManualAddress,
-  network: networkProp,
 }: {
   searchTerm: string;
   setSearchTerm: (val: string) => void;
   manualAddress: string;
   setManualAddress: (val: string) => void;
-  network?: "testnet" | "mainnet";
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [nodes, setNodes, onNodesChange] = useNodesState([] as any[]);
@@ -501,12 +499,7 @@ export default function BubbleMap({
   const [classFilter, setClassFilter] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-
-  // Hydrate history from localStorage after mount (avoids SSR mismatch)
-  useEffect(() => {
-    setHistory(loadHistory());
-  }, []);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
 
   const addToHistory = useCallback((address: string, label: string, counterpartyCount: number) => {
     setHistory(prev => {
@@ -530,20 +523,7 @@ export default function BubbleMap({
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
   const tonWallet = useTonWallet();
-  const sdkRestored = useIsConnectionRestored();
-
-  // Timeout fallback: in Telegram’s WebView the SDK bridge restore can
-  // hang indefinitely.  After 3 s we force the UI to show the connect button.
-  const [restoredTimedOut, setRestoredTimedOut] = useState(false);
-  useEffect(() => {
-    if (sdkRestored) return;
-    const id = setTimeout(() => setRestoredTimedOut(true), 3000);
-    return () => clearTimeout(id);
-  }, [sdkRestored]);
-  const walletRestored = sdkRestored || restoredTimedOut;
-  // Use prop-driven network; fall back to wallet chain detection only if no prop
-  const walletChainNet = tonWallet?.account?.chain === "-239" ? "mainnet" : "testnet";
-  const currentNetwork = networkProp ?? walletChainNet;
+  const currentNetwork = tonWallet?.account?.chain === "-239" ? "mainnet" : "testnet";
 
   const [activeAddress, setActiveAddress] = useState<string>("");
   const lastLoadedRef = useRef<string>("");
@@ -850,7 +830,7 @@ const searchResults = knownWallets.filter((w) =>
       }
 
       const res = await fetch(
-        `/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`,
+        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`,
         fetchOptions
       );
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -890,7 +870,6 @@ const searchResults = knownWallets.filter((w) =>
       const amountNano = "10000000"; // 0.01 TON in nanotons
       const tx = await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 600,
-        network: currentNetwork === "mainnet" ? CHAIN.MAINNET : CHAIN.TESTNET,
         messages: [
           {
             address: PAYMENT_ADDRESS,
@@ -1548,36 +1527,6 @@ const searchResults = knownWallets.filter((w) =>
           paidWalletsRef.current.has(selected.id)
         ) : false}
       />
-
-      {/* Connect Wallet popup — centered card, NO full-screen inset-0 overlay.
-           The old approach (fixed inset-0 z-[9999] pointer-events-none) blocked
-           touch events in Telegram's WebView even with pointer-events-none. */}
-      {walletRestored && !userAddress && !manualAddress && !loading && (
-        <div
-          className="fixed z-[60] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                     bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl
-                     shadow-2xl p-8 max-w-sm w-[calc(100%-2rem)] text-center"
-          style={{ touchAction: "manipulation" }}
-        >
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
-            <span className="text-3xl">&#x1F4B0;</span>
-          </div>
-          <h2 className="text-lg font-bold text-white mb-2">Connect Your Wallet</h2>
-          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            Connect your TON wallet to explore your on-chain network, or enter an address manually above.
-          </p>
-          <button
-            onClick={() => {
-              try { tonConnectUI.openModal(); } catch (err) { console.error("openModal failed:", err); }
-            }}
-            className="w-full bg-[#00E5FF] text-[#0B0E11] px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-lg
-                       hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-            style={{ touchAction: "manipulation" }}
-          >
-            Connect Wallet
-          </button>
-        </div>
-      )}
     </>
   );
 }

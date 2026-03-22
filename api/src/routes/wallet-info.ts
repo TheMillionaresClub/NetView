@@ -3,17 +3,17 @@ import { getWalletInfoWasm } from "../lib/wasm-loader.js";
 
 const router = Router();
 
-// GET /api/wallet-info?address=...&network=mainnet|testnet
+// GET /api/wallet-info?address=...
 router.get("/", async (req, res) => {
-  const { address, network } = req.query as Record<string, string>;
+  const { address } = req.query;
 
-  if (!address) {
+  if (!address || typeof address !== "string") {
     return res.status(400).json({ error: "Missing ?address= query parameter" });
   }
 
   try {
     const bg = await getWalletInfoWasm();
-    const raw = await bg.get_address_information(address, network ?? null);
+    const raw = await bg.get_address_information(address);
 
     // Try to parse as JSON, otherwise return as raw balance
     try {

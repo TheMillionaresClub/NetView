@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::network::Network;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct RequestError {
-    pub code: u16,
-    pub error: String,
+    code: u16,
+    error: String
 }
 
 

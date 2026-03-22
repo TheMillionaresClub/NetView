@@ -31,7 +31,7 @@ interface NetworkResult {
 }
 
 router.get("/", async (req: Request, res: Response) => {
-  const { address, limit, network } = req.query as Record<string, string>;
+  const { address, limit } = req.query as Record<string, string>;
 
   if (!address) {
     return res.status(400).json({ error: "Missing ?address= query parameter" });
@@ -40,7 +40,7 @@ router.get("/", async (req: Request, res: Response) => {
   const txLimit = Math.min(Number(limit) || 50, 200);
 
   try {
-    const txs = await getTransactions(address, txLimit, network);
+    const txs = await getTransactions(address, txLimit);
 
     // Build a flow map per counterparty
     const flows = new Map<string, FlowSummary>();

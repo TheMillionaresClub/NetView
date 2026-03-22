@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   useTonConnectUI,
   useTonConnectModal,
@@ -13,20 +12,8 @@ export default function TonWalletComp() {
   const { open } = useTonConnectModal();
   const address = useTonAddress(true); // user-friendly form
   const rawAddress = useTonAddress(false);
-  const sdkRestored = useIsConnectionRestored();
+  const restored = useIsConnectionRestored();
 
-  // In Telegram Mini App (or certain mobile WebViews) the TonConnect SDK
-  // session restore can hang forever — the bridge never replies and
-  // `useIsConnectionRestored` stays false.  After a short timeout we
-  // force-show the connect button so the user isn't stuck on "Restoring…".
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    if (sdkRestored) return;
-    const id = setTimeout(() => setTimedOut(true), 3000);
-    return () => clearTimeout(id);
-  }, [sdkRestored]);
-
-  const restored = sdkRestored || timedOut;
   const connected = !!rawAddress;
 
   const truncated = address
@@ -49,7 +36,6 @@ export default function TonWalletComp() {
     return (
       <button
         onClick={() => open()}
-        style={{ touchAction: "manipulation" }}
         className="bg-[#00E5FF] text-[#0B0E11] px-4 py-1.5 text-[10px] font-headline font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
       >
         <span className="material-symbols-outlined text-sm">

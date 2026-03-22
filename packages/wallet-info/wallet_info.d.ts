@@ -15,11 +15,7 @@ export function analyze_wallet(address: string, network?: string | null, api_key
  */
 export function full_analysis(address: string, network?: string | null, api_key?: string | null): Promise<string>;
 
-/**
- * Fetch the balance for an address.
- * `network` — `"mainnet"` or `"testnet"` (default: testnet)
- */
-export function get_address_information(address: string, network?: string | null): Promise<string>;
+export function get_address_information(address: string): Promise<string>;
 
 /**
  * Fetch one page of transactions (max 100).
@@ -27,9 +23,8 @@ export function get_address_information(address: string, network?: string | null
  * Pass `lt` + `hash` from the previous call's `next_lt` / `next_hash` to
  * continue from where you left off.  When `next_lt` is `null` in the
  * response there are no more pages.
- * `network` — `"mainnet"` or `"testnet"` (default: testnet)
  */
-export function get_transactions(address: string, limit: number, lt?: string | null, hash?: string | null, api_key?: string | null, network?: string | null): Promise<any>;
+export function get_transactions(address: string, limit: number, lt?: string | null, hash?: string | null, api_key?: string | null): Promise<any>;
 
 /**
  * Convert any user-friendly TON address (bounceable, non-bounceable, testnet)

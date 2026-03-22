@@ -30,7 +30,7 @@ interface WalletProfile {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const API = "";
+const API = "http://localhost:3001";
 
 function nanoToTon(n: string | number) {
   return (Number(n) / 1e9).toFixed(4);

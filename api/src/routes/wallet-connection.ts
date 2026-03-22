@@ -17,7 +17,7 @@ async function getWasm() {
  * Simple (non-streaming) version.
  */
 router.post("/", async (req, res) => {
-    const { wallet_a, wallet_b, max_depth, max_degree, batch_size, network: reqNetwork } = req.body;
+    const { wallet_a, wallet_b, max_depth, max_degree, batch_size } = req.body;
 
     if (!wallet_a || !wallet_b) {
         return res.status(400).json({ error: "Missing wallet_a or wallet_b" });
@@ -26,7 +26,7 @@ router.post("/", async (req, res) => {
     // Only use TONAPI_KEY here – RPC_API_KEY is a toncenter key that
     // causes "illegal base32 data" 401 errors when sent to tonapi.io.
     const key = process.env.TONAPI_KEY || "";
-    const network = reqNetwork || process.env.TON_NETWORK || "testnet";
+    const network = process.env.TON_NETWORK || "testnet";
 
     try {
         const wasm = await getWasm();
@@ -66,7 +66,6 @@ router.get("/stream", async (req, res) => {
     const max_depth = req.query.max_depth
         ? Number(req.query.max_depth)
         : undefined;
-    const streamNetwork = (req.query.network as string) || process.env.TON_NETWORK || "testnet";
 
     if (!wallet_a || !wallet_b) {
         return res.status(400).json({ error: "Missing wallet_a or wallet_b" });
@@ -88,7 +87,7 @@ router.get("/stream", async (req, res) => {
     // Only use TONAPI_KEY here – RPC_API_KEY is a toncenter key that
     // causes "illegal base32 data" 401 errors when sent to tonapi.io.
     const key = process.env.TONAPI_KEY || "";
-    const network = streamNetwork;
+    const network = process.env.TON_NETWORK || "testnet";
 
     try {
         const wasm = await getWasm();
