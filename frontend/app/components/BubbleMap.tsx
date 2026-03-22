@@ -1286,28 +1286,6 @@ const searchResults = knownWallets.filter((w) =>
           </div>
         )}
 
-        {/* Connect Wallet popup */}
-        {!userAddress && !manualAddress && !loading && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center">
-            <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
-                <span className="text-3xl">&#x1F4B0;</span>
-              </div>
-              <h2 className="text-lg font-bold text-white mb-2">Connect Your Wallet</h2>
-              <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-                Connect your TON wallet to explore your on-chain network, or enter an address manually above.
-              </p>
-              <button
-                onClick={() => tonConnectUI.openModal()}
-                className="w-full bg-[#00E5FF] text-[#0B0E11] px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-lg
-                           hover:brightness-110 active:scale-95 transition-all"
-              >
-                Connect Wallet
-              </button>
-            </div>
-          </div>
-        )}
-
         {error && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-500/20 border border-red-500/40 text-red-300 px-4 py-2 rounded-lg text-sm">
             {error}
@@ -1558,6 +1536,35 @@ const searchResults = knownWallets.filter((w) =>
           paidWalletsRef.current.has(selected.id)
         ) : false}
       />
+
+      {/* Connect Wallet popup — rendered OUTSIDE <main> so ReactFlow can't capture touches */}
+      {!userAddress && !manualAddress && !loading && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+          <div
+            className="pointer-events-auto bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
+              <span className="text-3xl">&#x1F4B0;</span>
+            </div>
+            <h2 className="text-lg font-bold text-white mb-2">Connect Your Wallet</h2>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+              Connect your TON wallet to explore your on-chain network, or enter an address manually above.
+            </p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                try { tonConnectUI.openModal(); } catch (err) { console.error("openModal failed:", err); }
+              }}
+              className="w-full bg-[#00E5FF] text-[#0B0E11] px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-lg
+                         hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+            >
+              Connect Wallet
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
