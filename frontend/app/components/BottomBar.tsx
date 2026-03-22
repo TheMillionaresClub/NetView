@@ -33,12 +33,22 @@ export default function BottomBar() {
   const [done, setDone] = useState(false);
   const [collapsed, setCollapsed] = useState(typeof window !== 'undefined' && window.innerWidth < 640);
 
-  const restored   = useIsConnectionRestored();
+  const sdkRestored = useIsConnectionRestored();
   const address    = useTonAddress(true);   // user-friendly (EQ…)
   const rawAddress = useTonAddress(false);
   const wallet     = useTonWallet();
   const { open }   = useTonConnectModal();
   const connected  = !!rawAddress;
+
+  // Timeout fallback: in Telegram‟s WebView the SDK bridge restore can
+  // hang indefinitely. After 3 s we force the UI to show the connect button.
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    if (sdkRestored) return;
+    const id = setTimeout(() => setTimedOut(true), 3000);
+    return () => clearTimeout(id);
+  }, [sdkRestored]);
+  const restored = sdkRestored || timedOut;
 
   /* chain: "-239" = mainnet, "-3" = testnet */
   const chain      = wallet?.account?.chain;

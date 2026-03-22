@@ -21,7 +21,7 @@ import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
 
-import { useTonConnectUI, useTonAddress, useTonWallet, useTonConnectModal, CHAIN } from "@tonconnect/ui-react";
+import { useTonConnectUI, useTonAddress, useTonWallet, useTonConnectModal, useIsConnectionRestored, CHAIN } from "@tonconnect/ui-react";
 
 /* ================================================================
    TYPES
@@ -530,6 +530,17 @@ export default function BubbleMap({
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
   const tonWallet = useTonWallet();
+  const sdkRestored = useIsConnectionRestored();
+
+  // Timeout fallback: in Telegram’s WebView the SDK bridge restore can
+  // hang indefinitely.  After 3 s we force the UI to show the connect button.
+  const [restoredTimedOut, setRestoredTimedOut] = useState(false);
+  useEffect(() => {
+    if (sdkRestored) return;
+    const id = setTimeout(() => setRestoredTimedOut(true), 3000);
+    return () => clearTimeout(id);
+  }, [sdkRestored]);
+  const walletRestored = sdkRestored || restoredTimedOut;
   // Use prop-driven network; fall back to wallet chain detection only if no prop
   const walletChainNet = tonWallet?.account?.chain === "-239" ? "mainnet" : "testnet";
   const currentNetwork = networkProp ?? walletChainNet;
@@ -1539,7 +1550,7 @@ const searchResults = knownWallets.filter((w) =>
       />
 
       {/* Connect Wallet popup — rendered OUTSIDE <main> so ReactFlow can't capture touches */}
-      {!userAddress && !manualAddress && !loading && (
+      {walletRestored && !userAddress && !manualAddress && !loading && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
           <div
             className="pointer-events-auto bg-[#0f1923]/95 backdrop-blur-xl border border-[#1c2d42] rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center"
