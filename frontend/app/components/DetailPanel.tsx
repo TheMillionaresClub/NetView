@@ -235,9 +235,12 @@ export default function DetailPanel({
         setProfile(data.result);
         onProfileFetched?.(address, data.result);
       } else {
-        throw new Error(infoData.error ?? "Unknown error");
+        throw new Error(data.error ?? "Unknown error");
       }
 
+      const scraperRes = await fetch(
+        `/api/wallet-scraper?address=${encodeURIComponent(address)}&network=${network}`
+      );
       if (scraperRes.ok) {
         const scraperData = await scraperRes.json();
         if (scraperData.ok) setScraperProfile(scraperData.result);

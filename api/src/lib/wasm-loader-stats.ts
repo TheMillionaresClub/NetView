@@ -11,6 +11,7 @@ export async function getTonStatsWasm(): Promise<any> {
     const require = createRequire(import.meta.url);
     const pkgDir = dirname(require.resolve("ton-stats/package.json"));
 
+    // @ts-ignore — WASM bindgen generated module has no .d.ts
     const bg = await import("ton-stats/ton_stats_bg.js");
 
     const wasmPath = resolve(pkgDir, "ton_stats_bg.wasm");
