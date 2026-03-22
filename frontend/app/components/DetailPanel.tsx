@@ -78,7 +78,10 @@ interface Props {
   centerAddress: string | null;
   walletBalance: number | null;
   onExpand: (address: string) => void;
+  onExpandClearAndFocus: (address: string) => void;
+  onExpandKeepExisting: (address: string) => void;
   isExpanded: boolean;
+  hasOtherExpansions: boolean;
   cachedProfile?: WalletProfile | null;
   onProfileFetched?: (address: string, profile: WalletProfile) => void;
 }
@@ -152,7 +155,7 @@ function tokenColor(sym: string): string {
 /* ════════════════════════════════════════════════════════
    COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function DetailPanel({ wallet, onClose, flow, centerAddress, walletBalance, onExpand, isExpanded, cachedProfile, onProfileFetched }: Props) {
+export default function DetailPanel({ wallet, onClose, flow, centerAddress, walletBalance, onExpand, onExpandClearAndFocus, onExpandKeepExisting, isExpanded, hasOtherExpansions, cachedProfile, onProfileFetched }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<WalletProfile | null>(cachedProfile ?? null);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -328,7 +331,7 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
                     </button>
                   </>
                 )}
-                {!isCenter && !isExpanded && (
+                {!isCenter && !isExpanded && !hasOtherExpansions && (
                   <button
                     className="dp-unlock-btn"
                     onClick={() => onExpand(wallet.id)}
@@ -341,6 +344,35 @@ export default function DetailPanel({ wallet, onClose, flow, centerAddress, wall
                   >
                     Expand Network
                   </button>
+                )}
+                {!isCenter && !isExpanded && hasOtherExpansions && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8, width: "100%" }}>
+                    <div className="dp-block-label" style={{ marginBottom: 4 }}>EXPAND NETWORK</div>
+                    <button
+                      className="dp-unlock-btn"
+                      onClick={() => onExpandClearAndFocus(wallet.id)}
+                      style={{
+                        background: "rgba(234,88,12,0.25)",
+                        color: "#fb923c",
+                        border: "1px solid rgba(251,146,60,0.5)",
+                        fontSize: 11,
+                      }}
+                    >
+                      Clear &amp; Focus on this wallet
+                    </button>
+                    <button
+                      className="dp-unlock-btn"
+                      onClick={() => onExpandKeepExisting(wallet.id)}
+                      style={{
+                        background: "rgba(37,99,235,0.25)",
+                        color: "#60a5fa",
+                        border: "1px solid rgba(96,165,250,0.5)",
+                        fontSize: 11,
+                      }}
+                    >
+                      Keep existing &amp; add on top
+                    </button>
+                  </div>
                 )}
                 {isExpanded && (
                   <div className="dp-sub-text" style={{ marginTop: 8 }}>

@@ -455,8 +455,6 @@ export default function BubbleMap({
   const [filterOpen, setFilterOpen] = useState(false);
   /** History panel open/close */
   const [historyOpen, setHistoryOpen] = useState(false);
-  /** Expand confirmation dialog */
-  const [expandConfirm, setExpandConfirm] = useState<{ address: string; label: string } | null>(null);
 
   /** Tracking history */
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
@@ -766,23 +764,15 @@ export default function BubbleMap({
     setLoading(false);
   }, [fetchFullAnalysis, buildEdges, setNodes, setEdges]);
 
-  /* -- Handle expanding a secondary wallet's network -- */
+  /* -- Handle expanding a secondary wallet's network (simple expand) -- */
   const handleExpand = useCallback(async (address: string) => {
     if (expandedAddresses.includes(address)) return;
-    // If there are already expanded wallets beyond center, ask user
-    if (expandedAddresses.length > 1) {
-      setExpandConfirm({ address, label: shortAddr(address) });
-      return;
-    }
     await loadFromFullAnalysis(address, false);
     addToHistory(address, shortAddr(address), 0);
   }, [expandedAddresses, loadFromFullAnalysis, addToHistory]);
 
-  /** Confirm expand: clear old expansions and focus on this wallet */
-  const handleExpandClearAndFocus = useCallback(async () => {
-    if (!expandConfirm) return;
-    const { address, label } = expandConfirm;
-    setExpandConfirm(null);
+  /** Clear old expansions and focus on a specific wallet */
+  const handleExpandClearAndFocus = useCallback(async (address: string) => {
     // Clear the graph but keep center, reload center + new wallet
     clearGraph();
     if (activeAddress) {
@@ -790,17 +780,14 @@ export default function BubbleMap({
       await loadFromFullAnalysis(activeAddress, true);
     }
     await loadFromFullAnalysis(address, false);
-    addToHistory(address, label, 0);
-  }, [expandConfirm, clearGraph, activeAddress, loadFromFullAnalysis, addToHistory]);
+    addToHistory(address, shortAddr(address), 0);
+  }, [clearGraph, activeAddress, loadFromFullAnalysis, addToHistory]);
 
-  /** Confirm expand: keep existing and add on top */
-  const handleExpandKeepExisting = useCallback(async () => {
-    if (!expandConfirm) return;
-    const { address, label } = expandConfirm;
-    setExpandConfirm(null);
+  /** Keep existing expansions and add a wallet on top */
+  const handleExpandKeepExisting = useCallback(async (address: string) => {
     await loadFromFullAnalysis(address, false);
-    addToHistory(address, label, 0);
-  }, [expandConfirm, loadFromFullAnalysis, addToHistory]);
+    addToHistory(address, shortAddr(address), 0);
+  }, [loadFromFullAnalysis, addToHistory]);
 
   /** Load a wallet from history as a new center */
   const loadFromHistory = useCallback(async (address: string) => {
@@ -947,48 +934,6 @@ export default function BubbleMap({
 
   return (
     <>
-      {/* Expand confirmation dialog */}
-      {expandConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0f1923] border border-slate-600 rounded-2xl shadow-2xl p-6 w-96 text-white">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300 mb-3">Expand Network</h3>
-            <p className="text-xs text-slate-400 mb-1">
-              You&apos;re about to expand the network of:
-            </p>
-            <p className="text-sm font-mono text-blue-400 mb-4 break-all">{expandConfirm.address}</p>
-            <p className="text-xs text-slate-400 mb-5">
-              You already have {expandedAddresses.length - 1} wallet(s) expanded. What would you like to do?
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={handleExpandClearAndFocus}
-                className="w-full py-2.5 text-xs font-bold uppercase tracking-wide rounded-lg
-                           bg-orange-600/90 border border-orange-400/50 text-white
-                           hover:bg-orange-500 transition-all"
-              >
-                Clear &amp; Focus on this wallet
-              </button>
-              <button
-                onClick={handleExpandKeepExisting}
-                className="w-full py-2.5 text-xs font-bold uppercase tracking-wide rounded-lg
-                           bg-blue-600/90 border border-blue-400/50 text-white
-                           hover:bg-blue-500 transition-all"
-              >
-                Keep existing &amp; add on top
-              </button>
-              <button
-                onClick={() => setExpandConfirm(null)}
-                className="w-full py-2 text-xs font-bold uppercase tracking-wide rounded-lg
-                           bg-slate-700/60 border border-slate-600 text-slate-400
-                           hover:text-white transition-all"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* History panel (slide-out) */}
       {historyOpen && (
         <div className="fixed inset-0 z-[90] flex">
@@ -1135,10 +1080,6 @@ export default function BubbleMap({
             const wi = (node.data as any).walletInfo as WalletInfo;
             if (!wi) return;
             handleSelectNode(wi);
-            // Auto-expand on click if not yet expanded
-            if (!expandedAddresses.includes(wi.id) && wi.id !== "placeholder") {
-              handleExpand(wi.id);
-            }
           }}
           onPaneClick={() => setSelected(null)}
           fitView
@@ -1287,7 +1228,10 @@ export default function BubbleMap({
         centerAddress={centerAddr || userAddress || null}
         walletBalance={selected ? (walletBalances.get(selected.id) ?? null) : null}
         onExpand={handleExpand}
+        onExpandClearAndFocus={handleExpandClearAndFocus}
+        onExpandKeepExisting={handleExpandKeepExisting}
         isExpanded={selected ? expandedAddresses.includes(selected.id) : false}
+        hasOtherExpansions={expandedAddresses.length > 1}
         cachedProfile={selected ? (profileCache.get(selected.id) ?? null) : null}
         onProfileFetched={handleProfileFetched}
       />
