@@ -23,8 +23,9 @@ router.post("/", async (req, res) => {
         return res.status(400).json({ error: "Missing wallet_a or wallet_b" });
     }
 
-    const key =
-        process.env.TONAPI_KEY || process.env.RPC_API_KEY || "";
+    // Only use TONAPI_KEY here – RPC_API_KEY is a toncenter key that
+    // causes "illegal base32 data" 401 errors when sent to tonapi.io.
+    const key = process.env.TONAPI_KEY || "";
     const network = process.env.TON_NETWORK || "testnet";
 
     try {
@@ -83,8 +84,9 @@ router.get("/stream", async (req, res) => {
         cancelled = true;
     });
 
-    const key =
-        process.env.TONAPI_KEY || process.env.RPC_API_KEY || "";
+    // Only use TONAPI_KEY here – RPC_API_KEY is a toncenter key that
+    // causes "illegal base32 data" 401 errors when sent to tonapi.io.
+    const key = process.env.TONAPI_KEY || "";
     const network = process.env.TON_NETWORK || "testnet";
 
     try {

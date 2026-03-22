@@ -20,6 +20,15 @@ export async function getWalletInfoWasm(): Promise<any> {
     });
 
     bg.__wbg_set_wasm(wasmModule.instance.exports);
+
+    // Initialise the externref table + other wasm-bindgen internals.
+    // Without this call, string conversions across the WASM boundary crash
+    // with "The encoded data was not valid for encoding utf-8".
+    const exports = wasmModule.instance.exports as Record<string, any>;
+    if (typeof exports.__wbindgen_start === "function") {
+        exports.__wbindgen_start();
+    }
+
     bgModule = bg;
     return bg;
 }

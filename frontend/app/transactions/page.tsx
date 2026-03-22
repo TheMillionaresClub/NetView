@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
 import TopNavBar from "../components/TopNavBar";
 import SideNavBar from "../components/SideNavBar";
+
+const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
+const EXPRESS_API = "http://localhost:3001";
 
 // ── Types matching the Rust Transaction struct ───────────────────
 interface Transaction {
@@ -59,11 +63,17 @@ export default function TransactionsPage() {
   // Filter
   const [filterAction, setFilterAction] = useState<"All" | "Send" | "Receive">("All");
 
+  const [tonConnectUI] = useTonConnectUI();
+  const userAddr = useTonAddress();
+  const tonWallet = useTonWallet();
+  const network = tonWallet?.account?.chain === "-239" ? "mainnet" : "testnet";
+
   const isBulk = limit > 100;
   const cost = isBulk ? "0.02 TON" : "0.01 TON";
 
   const fetchTransactions = async () => {
     if (!address.trim()) return;
+    if (!userAddr) { setError("Connect your TON wallet first"); return; }
     setLoading(true);
     setError(null);
     setTransactions([]);
@@ -73,23 +83,29 @@ export default function TransactionsPage() {
     const t0 = performance.now();
 
     try {
-      // Call the Next.js proxy which uses x402Fetch internally
-      const resp = await fetch("/api/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: address.trim(), limit }),
+      // 1. Send payment via TonConnect
+      const queryId = Date.now().toString();
+      const tx = await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 600,
+        messages: [{ address: PAYMENT_ADDRESS, amount: isBulk ? "20000000" : "10000000" }],
       });
 
+      // 2. Call Express API directly with x402 payment signature
+      const sig = btoa(JSON.stringify({
+        scheme: "ton-v1", network, boc: tx.boc, fromAddress: userAddr, queryId,
+      }));
+      const params = new URLSearchParams({ address: address.trim(), limit: String(limit) });
+      const url = isBulk
+        ? `${EXPRESS_API}/api/wallet-transactions/bulk?${params}`
+        : `${EXPRESS_API}/api/wallet-transactions?${params}`;
+
+      const resp = await fetch(url, { headers: { "PAYMENT-SIGNATURE": sig } });
       const data = await resp.json();
 
-      if (!resp.ok) {
-        throw new Error(data.error ?? `HTTP ${resp.status}`);
-      }
+      if (!resp.ok) throw new Error(data.error ?? `HTTP ${resp.status}`);
 
       setTransactions(data.result?.transactions ?? []);
-      if (data.payment) {
-        setPayment(data.payment);
-      }
+      setPayment({ paid: true, txHash: null, network, cost });
     } catch (e: unknown) {
       setError((e as Error).message ?? "Unknown error");
     } finally {
@@ -197,7 +213,7 @@ export default function TransactionsPage() {
             </div>
             <button
               onClick={fetchTransactions}
-              disabled={loading || !address.trim()}
+              disabled={loading || !address.trim() || !userAddr}
               style={{
                 background: "#00e5ff",
                 color: "#0b0e11",
@@ -207,13 +223,13 @@ export default function TransactionsPage() {
                 fontSize: 11,
                 fontWeight: 700,
                 fontFamily: "'Share Tech Mono', monospace",
-                cursor: loading || !address.trim() ? "not-allowed" : "pointer",
+                cursor: loading || !address.trim() || !userAddr ? "not-allowed" : "pointer",
                 letterSpacing: 1,
-                opacity: loading || !address.trim() ? 0.4 : 1,
+                opacity: loading || !address.trim() || !userAddr ? 0.4 : 1,
                 height: 38,
               }}
             >
-              {loading ? "PAYING..." : `FETCH - ${cost}`}
+              {loading ? "PAYING..." : !userAddr ? "CONNECT WALLET" : `FETCH - ${cost}`}
             </button>
           </div>
 
