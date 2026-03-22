@@ -73,6 +73,24 @@ export interface WalletProfile {
 
 const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
 
+// ── Scraper types (wallet-scraper crate) ─────────────────────────────────────
+
+interface ScraperAccountMeta { type: "AccountMeta"; linked_name: string | null; icon_url: string | null; }
+interface ScraperTelegramIdentity {
+  type: "TelegramIdentity";
+  owned_usernames: string[];
+  owned_phone_numbers: string[];
+  dns_records: string[];
+  linked_telegram: string | null;
+  avatar_url: string | null;
+}
+interface ScraperCounterpartyId { address: string; name: string; icon_url: string | null; is_wallet: boolean; role: string; }
+interface ScraperCounterpartyIdentities { type: "CounterpartyIdentities"; identities: ScraperCounterpartyId[]; events_scanned: number; }
+interface ScraperWalletLabel { type: "WalletLabel"; source: string; label: string; category: string | null; }
+interface ScraperTonDomain  { type: "TonDomain"; domain: string; }
+type ScraperInsight = ScraperAccountMeta | ScraperTelegramIdentity | ScraperCounterpartyIdentities | ScraperWalletLabel | ScraperTonDomain | { type: string };
+interface ScraperProfile { address: string; insights: ScraperInsight[]; errors: { source_name: string; error: string }[]; elapsed_ms: number; }
+
 interface Props {
   wallet: WalletData | null;
   onClose: () => void;
@@ -186,6 +204,7 @@ export default function DetailPanel({
   const [profile, setProfile] = useState<WalletProfile | null>(cachedProfile ?? null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [scraperProfile, setScraperProfile] = useState<ScraperProfile | null>(null);
 
   // Payment state
   const [paymentPending, setPaymentPending] = useState(false);
@@ -199,21 +218,28 @@ export default function DetailPanel({
     if (isOwnWallet) setAnalysisPaid(true);
   }, [isOwnWallet]);
 
-  /* Fetch full on-chain profile (no payment needed for analysis endpoint) */
+  /* Fetch full on-chain profile + scraper intelligence in parallel */
   const fetchFullAnalysis = useCallback(async (address: string) => {
     setLoadingProfile(true);
     setProfileError(null);
     try {
-      const res = await fetch(
-        `http://localhost:3001/api/wallet-analysis?address=${encodeURIComponent(address)}&network=${network}`
-      );
-      if (!res.ok) throw new Error("API " + res.status);
-      const data = await res.json();
-      if (data.ok) {
-        setProfile(data.result);
-        onProfileFetched?.(address, data.result);
+      const [infoRes, scraperRes] = await Promise.all([
+        fetch(`http://localhost:3001/api/wallet-analysis?address=${encodeURIComponent(address)}&network=${network}`),
+        fetch(`http://localhost:3001/api/wallet-scraper?address=${encodeURIComponent(address)}&network=${network}`),
+      ]);
+
+      if (!infoRes.ok) throw new Error("API " + infoRes.status);
+      const infoData = await infoRes.json();
+      if (infoData.ok) {
+        setProfile(infoData.result);
+        onProfileFetched?.(address, infoData.result);
       } else {
-        throw new Error(data.error ?? "Unknown error");
+        throw new Error(infoData.error ?? "Unknown error");
+      }
+
+      if (scraperRes.ok) {
+        const scraperData = await scraperRes.json();
+        if (scraperData.ok) setScraperProfile(scraperData.result);
       }
     } catch (err: any) {
       setProfileError(err.message ?? "Failed to fetch");
@@ -226,6 +252,7 @@ export default function DetailPanel({
   useEffect(() => {
     const cached = cachedProfile ?? null;
     setProfile(cached);
+    setScraperProfile(null);
     setProfileError(null);
     setPaymentError(null);
     setAnalysisPaid(cached != null);
@@ -302,6 +329,17 @@ export default function DetailPanel({
 
   const otherCounterparties = profile ? aggregateCounterparties(profile.recent_transactions, centerAddress) : [];
 
+  // ── Scraper-derived data (wallet-info has priority on shared fields) ──────
+  const scraperMeta        = scraperProfile?.insights.find(i => i.type === "AccountMeta") as ScraperAccountMeta | undefined;
+  const telegramIdentity   = scraperProfile?.insights.find(i => i.type === "TelegramIdentity") as ScraperTelegramIdentity | undefined;
+  const counterpartyIds    = scraperProfile?.insights.find(i => i.type === "CounterpartyIdentities") as ScraperCounterpartyIdentities | undefined;
+  const walletLabels       = scraperProfile?.insights.filter(i => i.type === "WalletLabel") as ScraperWalletLabel[] | undefined;
+  const scraperDomains     = scraperProfile?.insights.filter(i => i.type === "TonDomain") as ScraperTonDomain[] | undefined;
+  const telegramName       = telegramIdentity?.linked_telegram ?? scraperMeta?.linked_name ?? null;
+  const telegramAvatarUrl  = telegramIdentity?.avatar_url ?? scraperMeta?.icon_url ?? null;
+  // Only show scraper domains if wallet-info dns_names is empty
+  const extraDomains       = (profile?.dns_names?.length ?? 0) === 0 ? (scraperDomains ?? []) : [];
+
   return (
     <>
       <div className="dp-backdrop" onClick={onClose} />
@@ -318,14 +356,27 @@ export default function DetailPanel({
           <div className="dp-avatar" style={{
             background: theme.bg,
             border: "1.5px solid " + theme.color,
+            overflow: "hidden",
+            padding: 0,
           }}>
-            <span style={{ color: theme.color, fontSize: 16, fontWeight: 700, letterSpacing: 1 }}>
-              {theme.label.charAt(0)}
-            </span>
+            {telegramAvatarUrl ? (
+              <img src={telegramAvatarUrl} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <span style={{ color: theme.color, fontSize: 16, fontWeight: 700, letterSpacing: 1 }}>
+                {theme.label.charAt(0)}
+              </span>
+            )}
           </div>
           <div className="dp-header-info">
             <div className="dp-wallet-name">{wallet.name}</div>
             <div className="dp-wallet-id">{wallet.id}</div>
+            {telegramName && (
+              <div style={{ fontSize: 11, color: "#7C4DFF", fontWeight: 700, marginTop: 2 }}>
+                @{telegramName.replace(".t.me", "")}
+                <a href={`https://t.me/${telegramName.replace(".t.me", "")}`} target="_blank" rel="noopener noreferrer"
+                   style={{ marginLeft: 6, fontSize: 9, color: "#4a6080", textDecoration: "none" }}>t.me →</a>
+              </div>
+            )}
             {onchainKind ? (
               <span className="dp-badge" style={{ color: theme.color, borderColor: theme.color, background: theme.bg }}>
                 {theme.label} - {Math.round(confidence * 100)}%
@@ -389,6 +440,44 @@ export default function DetailPanel({
                   <div className="dp-sub-text">
                     Status: <span style={{ color: status === "active" ? "#22c55e" : "#f59e0b" }}>{status}</span>
                     {profile?.state?.wallet_type && (" - " + profile.state.wallet_type)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Telegram Identity (from wallet-scraper) */}
+            {(telegramIdentity || telegramName) && (
+              <div className="dp-block">
+                <div className="dp-block-label">TELEGRAM IDENTITY</div>
+                {telegramName && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    {telegramAvatarUrl && (
+                      <img src={telegramAvatarUrl} alt="tg" style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid rgba(124,77,255,.4)", flexShrink: 0 }} />
+                    )}
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#7C4DFF" }}>@{telegramName.replace(".t.me", "")}</div>
+                      <div className="dp-sub-text">Linked to this wallet</div>
+                    </div>
+                  </div>
+                )}
+                {telegramIdentity && telegramIdentity.owned_usernames.length > 0 && (
+                  <div style={{ marginBottom: 6 }}>
+                    <div className="dp-sub-text" style={{ marginBottom: 3 }}>Owned Usernames</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {telegramIdentity.owned_usernames.map(u => (
+                        <span key={u} style={{ fontSize: 10, background: "rgba(124,77,255,.15)", color: "#7C4DFF", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>@{u}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {telegramIdentity && telegramIdentity.owned_phone_numbers.length > 0 && (
+                  <div>
+                    <div className="dp-sub-text" style={{ marginBottom: 3 }}>Anonymous Numbers</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {telegramIdentity.owned_phone_numbers.map(p => (
+                        <span key={p} style={{ fontSize: 10, background: "rgba(255,214,0,.1)", color: "#FFD600", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{p}</span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -493,7 +582,7 @@ export default function DetailPanel({
               <div className="dp-block" style={{ textAlign: "center", padding: "20px 16px" }}>
                 <div className="dp-spinner" style={{ margin: "0 auto 12px" }} />
                 <div className="dp-block-label">ANALYZING WALLET</div>
-                <div className="dp-sub-text">Fetching balance, jettons, NFTs, transactions...</div>
+                <div className="dp-sub-text">Fetching balance, Telegram identity, NFTs, jettons, transactions...</div>
               </div>
             )}
 
@@ -570,11 +659,37 @@ export default function DetailPanel({
 
             {/* Classification signals */}
             {profile?.classification?.signals && profile.classification.signals.length > 0 && (
-              <div className="dp-block" style={{ borderBottom: "none" }}>
+              <div className="dp-block">
                 <div className="dp-block-label">CLASSIFICATION SIGNALS</div>
                 {profile.classification.signals.map((s, i) => (
                   <div key={i} className="dp-signal">- {s}</div>
                 ))}
+              </div>
+            )}
+
+            {/* Explorer Labels (from wallet-scraper) */}
+            {walletLabels && walletLabels.length > 0 && (
+              <div className="dp-block">
+                <div className="dp-block-label">EXPLORER LABELS</div>
+                {walletLabels.map((l, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+                    <span style={{ fontSize: 10, background: "rgba(255,214,0,.1)", color: "#FFD600", padding: "1px 7px", borderRadius: 3, fontWeight: 700 }}>{l.label}</span>
+                    {l.category && <span className="dp-sub-text">{l.category}</span>}
+                    <span className="dp-sub-text" style={{ marginLeft: "auto" }}>via {l.source}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* .TON Domains (from scraper, shown when wallet-info has none) */}
+            {extraDomains.length > 0 && (
+              <div className="dp-block" style={{ borderBottom: "none" }}>
+                <div className="dp-block-label">.TON DOMAINS</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {extraDomains.map(d => (
+                    <span key={d.domain} style={{ fontSize: 11, color: "#00E5FF", fontFamily: "monospace" }}>{d.domain}</span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -655,6 +770,42 @@ export default function DetailPanel({
                       </div>
                     );
                   })}
+                </div>
+              </>
+            )}
+
+            {/* Known Telegram counterparties (from wallet-scraper events scan) */}
+            {counterpartyIds && counterpartyIds.identities.length > 0 && (
+              <>
+                <div className="dp-block-label" style={{ padding: "14px 16px 8px" }}>
+                  TELEGRAM COUNTERPARTIES ({counterpartyIds.identities.length} / {counterpartyIds.events_scanned} events)
+                </div>
+                <div className="dp-tx-list">
+                  {counterpartyIds.identities.map(cp => (
+                    <div key={cp.address} className="dp-tx-row">
+                      <div className="dp-tx-arrow" style={{
+                        background: cp.role === "sender" ? "rgba(255,109,0,.15)" : "rgba(0,230,118,.12)",
+                        color: cp.role === "sender" ? "#FF9100" : "#22c55e",
+                      }}>
+                        {cp.role === "sender" ? "IN" : "OUT"}
+                      </div>
+                      <div className="dp-tx-detail">
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          {cp.icon_url && (
+                            <img src={cp.icon_url} alt={cp.name} style={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0 }} />
+                          )}
+                          <div className="dp-tx-action" style={{ color: "#7C4DFF", fontWeight: 700 }}>
+                            @{cp.name.replace(".t.me", "")}
+                          </div>
+                        </div>
+                        <div className="dp-tx-token">{shortAddr(cp.address)}</div>
+                      </div>
+                      <div className="dp-tx-right">
+                        <a href={`https://t.me/${cp.name.replace(".t.me", "")}`} target="_blank" rel="noopener noreferrer"
+                           style={{ fontSize: 9, color: "#4a6080", textDecoration: "none" }}>t.me →</a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </>
             )}

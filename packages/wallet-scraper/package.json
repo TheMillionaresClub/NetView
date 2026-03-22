@@ -1,0 +1,17 @@
+{
+  "name": "wallet-scraper",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "wallet_scraper_bg.wasm",
+    "wallet_scraper.js",
+    "wallet_scraper_bg.js",
+    "wallet_scraper.d.ts"
+  ],
+  "main": "wallet_scraper.js",
+  "types": "wallet_scraper.d.ts",
+  "sideEffects": [
+    "./wallet_scraper.js",
+    "./snippets/*"
+  ]
+}
