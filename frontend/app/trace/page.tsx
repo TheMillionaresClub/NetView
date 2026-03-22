@@ -16,7 +16,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import TopNavBar from "../components/TopNavBar";
 import SideNavBar from "../components/SideNavBar";
-import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
+import { useTonConnectUI, useTonAddress, useTonWallet, CHAIN } from "@tonconnect/ui-react";
 
 const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
 
@@ -281,12 +281,14 @@ export default function TracePage() {
     setPaymentError(null);
     try {
       const amountNano = String(Math.floor(traceCostNano(maxDepth)));
+      const chainId = wallet?.account?.chain ?? CHAIN.TESTNET;
       const tx = await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 600,
+        network: chainId,
         messages: [{ address: PAYMENT_ADDRESS, amount: amountNano }],
       });
       const queryId = Date.now().toString();
-      const network = wallet?.account?.chain ?? "-239";
+      const network = chainId;
       const payloadObj = { scheme: "ton-v1", network, boc: tx.boc, fromAddress: userAddress || "", queryId };
       const paymentSig = btoa(JSON.stringify(payloadObj));
       runSearch(paymentSig);

@@ -21,7 +21,7 @@ import "@xyflow/react/dist/style.css";
 import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
 
-import { useTonConnectUI, useTonAddress, useTonWallet, useTonConnectModal } from "@tonconnect/ui-react";
+import { useTonConnectUI, useTonAddress, useTonWallet, useTonConnectModal, CHAIN } from "@tonconnect/ui-react";
 
 /* ================================================================
    TYPES
@@ -879,6 +879,7 @@ const searchResults = knownWallets.filter((w) =>
       const amountNano = "10000000"; // 0.01 TON in nanotons
       const tx = await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 600,
+        network: currentNetwork === "mainnet" ? CHAIN.MAINNET : CHAIN.TESTNET,
         messages: [
           {
             address: PAYMENT_ADDRESS,
