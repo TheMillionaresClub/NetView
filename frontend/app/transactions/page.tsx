@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
+import { useTonConnectUI, useTonAddress, useTonWallet, CHAIN } from "@tonconnect/ui-react";
 import TopNavBar from "../components/TopNavBar";
 import SideNavBar from "../components/SideNavBar";
 
@@ -87,6 +87,7 @@ export default function TransactionsPage() {
       const queryId = Date.now().toString();
       const tx = await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 600,
+        network: network === "mainnet" ? CHAIN.MAINNET : CHAIN.TESTNET,
         messages: [{ address: PAYMENT_ADDRESS, amount: isBulk ? "20000000" : "10000000" }],
       });
 

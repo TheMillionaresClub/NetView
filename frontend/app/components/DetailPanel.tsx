@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useTonConnectUI } from "@tonconnect/ui-react";
+import { useTonConnectUI, CHAIN } from "@tonconnect/ui-react";
 
 /* ════════════════════════════════════════════════════════
    TYPES
@@ -280,6 +280,7 @@ export default function DetailPanel({
       const amountNano = "10000000"; // 0.01 TON
       const tx = await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 600,
+        network: network === "mainnet" ? CHAIN.MAINNET : CHAIN.TESTNET,
         messages: [
           {
             address: PAYMENT_ADDRESS,
