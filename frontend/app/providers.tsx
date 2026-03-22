@@ -13,10 +13,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const [twaReturn, setTwaReturn] = useState<`${string}://${string}` | undefined>(undefined);
 
   useEffect(() => {
-    // Absolute manifest URL — NEXT_PUBLIC_APP_URL if set, otherwise derive from
-    // the browser URL (works for ngrok / vercel / any host).
+    // Absolute manifest URL — use the dynamic API route so the manifest `url`
+    // field always matches the actual origin (ngrok / vercel / any host).
     const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-    setManifestUrl(`${base}/tonconnect-manifest.json`);
+    setManifestUrl(`${base}/api/tonconnect-manifest`);
 
     // If running inside a Telegram mini-app, set the return URL so the wallet
     // redirects back after approval.
