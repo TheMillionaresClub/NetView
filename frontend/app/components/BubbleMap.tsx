@@ -947,6 +947,126 @@ export default function BubbleMap({
 
   return (
     <>
+      {/* Expand confirmation dialog */}
+      {expandConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#0f1923] border border-slate-600 rounded-2xl shadow-2xl p-6 w-96 text-white">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300 mb-3">Expand Network</h3>
+            <p className="text-xs text-slate-400 mb-1">
+              You&apos;re about to expand the network of:
+            </p>
+            <p className="text-sm font-mono text-blue-400 mb-4 break-all">{expandConfirm.address}</p>
+            <p className="text-xs text-slate-400 mb-5">
+              You already have {expandedAddresses.length - 1} wallet(s) expanded. What would you like to do?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleExpandClearAndFocus}
+                className="w-full py-2.5 text-xs font-bold uppercase tracking-wide rounded-lg
+                           bg-orange-600/90 border border-orange-400/50 text-white
+                           hover:bg-orange-500 transition-all"
+              >
+                Clear &amp; Focus on this wallet
+              </button>
+              <button
+                onClick={handleExpandKeepExisting}
+                className="w-full py-2.5 text-xs font-bold uppercase tracking-wide rounded-lg
+                           bg-blue-600/90 border border-blue-400/50 text-white
+                           hover:bg-blue-500 transition-all"
+              >
+                Keep existing &amp; add on top
+              </button>
+              <button
+                onClick={() => setExpandConfirm(null)}
+                className="w-full py-2 text-xs font-bold uppercase tracking-wide rounded-lg
+                           bg-slate-700/60 border border-slate-600 text-slate-400
+                           hover:text-white transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History panel (slide-out) */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-[90] flex">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" onClick={() => setHistoryOpen(false)} />
+          {/* Panel */}
+          <div className="relative ml-auto w-80 h-full bg-[#0a1018] border-l border-slate-700 overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-[#0a1018] border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-300">Tracking History</h2>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="text-slate-500 hover:text-white text-lg transition-colors"
+              >
+                &times;
+              </button>
+            </div>
+            {history.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs text-slate-500">
+                No wallets tracked yet
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {history.map((entry) => {
+                  const isActive = entry.address === activeAddress;
+                  const dateStr = new Date(entry.timestamp).toLocaleDateString("en-US", {
+                    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                  });
+                  return (
+                    <div
+                      key={entry.address}
+                      className={`px-4 py-3 border-b border-slate-800 flex items-start gap-3 group transition-colors
+                        ${isActive ? "bg-blue-900/20" : "hover:bg-slate-800/50"}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          {isActive && (
+                            <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                          )}
+                          <span className="text-xs font-mono text-slate-300 truncate">
+                            {entry.label}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-mono text-slate-500 block truncate">
+                          {entry.address}
+                        </span>
+                        <span className="text-[9px] text-slate-600 mt-0.5 block">
+                          {dateStr}
+                        </span>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => loadFromHistory(entry.address)}
+                          title="Load as center wallet"
+                          className="px-2 py-1 text-[9px] font-bold uppercase rounded
+                                     bg-blue-600/80 border border-blue-400/40 text-white
+                                     hover:bg-blue-500 transition-all"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => removeFromHistory(entry.address)}
+                          title="Remove from history"
+                          className="px-2 py-1 text-[9px] font-bold rounded
+                                     bg-red-600/40 border border-red-500/40 text-red-300
+                                     hover:bg-red-600/60 transition-all"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <main className="fixed left-0 sm:left-20 right-0 top-24 bottom-0 overflow-hidden"
             style={{ background: "#080d14" }}>
 
@@ -1028,18 +1148,30 @@ export default function BubbleMap({
           <Background color="#1a2535" gap={26} size={1} />
           <Controls />
 
-          {/* Realign button */}
+          {/* Realign + History buttons */}
           <Panel position="top-left" style={{ marginTop: 8, marginLeft: 8 }}>
-            <button
-              onClick={handleRealign}
-              title="Auto-layout: spread overlapping nodes"
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
-                         bg-blue-600/90 border border-blue-400/50 text-white rounded-lg
-                         hover:bg-blue-500 hover:border-blue-300 transition-all cursor-pointer
-                         backdrop-blur-sm shadow-lg"
-            >
-              &#x2728; Realign
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRealign}
+                title="Auto-layout: spread overlapping nodes"
+                className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
+                           bg-blue-600/90 border border-blue-400/50 text-white rounded-lg
+                           hover:bg-blue-500 hover:border-blue-300 transition-all cursor-pointer
+                           backdrop-blur-sm shadow-lg"
+              >
+                &#x2728; Realign
+              </button>
+              <button
+                onClick={() => setHistoryOpen(true)}
+                title="View tracking history"
+                className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
+                           bg-slate-700/90 border border-slate-500/50 text-slate-200 rounded-lg
+                           hover:bg-slate-600 hover:border-slate-400 transition-all cursor-pointer
+                           backdrop-blur-sm shadow-lg"
+              >
+                &#x1F4CB; History{history.length > 0 ? ` (${history.length})` : ""}
+              </button>
+            </div>
           </Panel>
 
           {/* Filter panel */}
