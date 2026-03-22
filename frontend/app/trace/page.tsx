@@ -71,7 +71,7 @@ function nanoToTon(n: number) {
   return (Math.abs(n) / 1e9).toFixed(4);
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API = "";
 
 // ── Custom Node ──────────────────────────────────────────────────
 function WalletNode({ data }: { data: any }) {

@@ -81,7 +81,7 @@ interface WalletProfile {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API = "";
 
 function nanoToTon(nano: string | number): string {
   return (Number(nano) / 1e9).toFixed(4);

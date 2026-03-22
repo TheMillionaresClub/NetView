@@ -39,7 +39,7 @@ export default function WalletPage() {
     setLoading(true);
     setError(null);
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/wallet-info?address=${encodeURIComponent(address)}`)
+    fetch(`/api/wallet-info?address=${encodeURIComponent(address)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.ok) {

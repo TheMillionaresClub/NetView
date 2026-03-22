@@ -61,7 +61,7 @@ export default function BottomBar() {
       setStatsLoading(true);
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/wallet-network?address=${encodeURIComponent(rawAddress)}&limit=50`
+          `/api/wallet-network?address=${encodeURIComponent(rawAddress)}&limit=50`
         );
         if (!res.ok) throw new Error("API " + res.status);
         const json = await res.json();

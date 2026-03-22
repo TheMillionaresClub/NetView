@@ -6,7 +6,7 @@ export async function normalizeToBounceable(address: string): Promise<string> {
   if (!address) return address;
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api/normalize-address?address=${encodeURIComponent(address)}`
+      `/api/normalize-address?address=${encodeURIComponent(address)}`
     );
     if (!res.ok) return address;
     const data = await res.json();
