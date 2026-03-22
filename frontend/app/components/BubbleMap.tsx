@@ -939,16 +939,21 @@ const searchResults = knownWallets.filter((w) =>
       return;
     }
 
-    // Check pending payment
+    // Check pending payment (fresh boc from this session)
     const pending = pendingExpand.get(address);
-    if (!pending) return;
+    if (pending) {
+      const fromAddress = userAddress || "";
+      await loadNetworkWithPayment(address, false, pending.boc, pending.queryId, fromAddress, currentNetwork);
+      addToHistory(address, shortAddr(address), 0);
+      return;
+    }
 
-    const fromAddress = userAddress || "";
-    await loadNetworkWithPayment(
-      address, false, pending.boc, pending.queryId, fromAddress, currentNetwork
-    );
-    addToHistory(address, shortAddr(address), 0);
-  }, [expandedAddresses, pendingExpand, networkDataCacheRef, applyNetworkData, loadNetworkWithPayment, userAddress, currentNetwork, addToHistory]);
+    // Already paid in a previous session → call API for free (no payment header)
+    if (paidWalletsRef.current.has(address)) {
+      await loadNetworkWithPayment(address, false, null, "", userAddress || "", currentNetwork);
+      addToHistory(address, shortAddr(address), 0);
+    }
+  }, [expandedAddresses, pendingExpand, paidWalletsRef, networkDataCacheRef, applyNetworkData, loadNetworkWithPayment, userAddress, currentNetwork, addToHistory]);
 
   /* ----------------------------------------------------------------
      handleHide — hide edges/nodes for that address's network
@@ -1186,7 +1191,7 @@ const searchResults = knownWallets.filter((w) =>
     <>
       {/* History panel (slide-out) */}
       {historyOpen && (
-        <div className="fixed inset-0 z-[90] flex">
+        <div className="fixed inset-0 z-110 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setHistoryOpen(false)} />
           <div className="relative ml-auto w-full sm:w-80 h-full bg-[#0a1018] border-l border-slate-700 overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-[#0a1018] border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
@@ -1503,12 +1508,24 @@ const searchResults = knownWallets.filter((w) =>
         onPaid={handleOnPaid}
         isExpanded={selected ? expandedAddresses.includes(selected.id) : false}
         isHidden={selected ? hiddenNetworks.has(selected.id) : false}
-        canExpand={selected ? (pendingExpand.has(selected.id) && !expandedAddresses.includes(selected.id)) : false}
+        canExpand={selected ? (
+          !expandedAddresses.includes(selected.id) && (
+            pendingExpand.has(selected.id) ||
+            networkDataCacheRef.current.has(selected.id) ||
+            paidWalletsRef.current.has(selected.id)  // already paid → can expand (free API call)
+          )
+        ) : false}
         onExpand={handleExpand}
         onHide={handleHide}
         onShow={handleShow}
         cachedProfile={selected ? (profileCache.get(selected.id) ?? null) : null}
         onProfileFetched={handleProfileFetched}
+        alreadyPaid={selected ? (
+          // Own wallet is always free
+          (!manualAddress && !!userAddress && selected.id === activeAddress) ||
+          // Already paid in any previous session → never pay again
+          paidWalletsRef.current.has(selected.id)
+        ) : false}
       />
     </>
   );

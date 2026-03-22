@@ -91,6 +91,7 @@ interface Props {
   onShow: (address: string) => void;
   cachedProfile?: WalletProfile | null;
   onProfileFetched?: (address: string, profile: WalletProfile) => void;
+  alreadyPaid?: boolean; // true if BubbleMap already confirmed payment (paidWallets or own wallet)
 }
 
 /* ════════════════════════════════════════════════════════
@@ -179,6 +180,7 @@ export default function DetailPanel({
   onShow,
   cachedProfile,
   onProfileFetched,
+  alreadyPaid = false,
 }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [tonConnectUI] = useTonConnectUI();
@@ -192,12 +194,13 @@ export default function DetailPanel({
   const [paymentError, setPaymentError] = useState<string | null>(null);
   // Own wallet never requires payment
   const isOwnWallet = !!userAddress && !!wallet && wallet.id === userAddress;
-  // analysisPaid: true if cached, already paid this session, or it's the user's own wallet
-  const [analysisPaid, setAnalysisPaid] = useState<boolean>(cachedProfile != null || isOwnWallet);
-  // Sync in case userAddress resolves async after initial render
+  const isFree = isOwnWallet || alreadyPaid;
+  // analysisPaid: true if cached, already paid, or it's the user's own wallet
+  const [analysisPaid, setAnalysisPaid] = useState<boolean>(cachedProfile != null || isFree);
+  // Sync in case userAddress or alreadyPaid resolves after initial render
   useEffect(() => {
-    if (isOwnWallet) setAnalysisPaid(true);
-  }, [isOwnWallet]);
+    if (isFree) setAnalysisPaid(true);
+  }, [isFree]);
 
   /* Fetch full on-chain profile (no payment needed for analysis endpoint) */
   const fetchFullAnalysis = useCallback(async (address: string) => {
@@ -228,8 +231,14 @@ export default function DetailPanel({
     setProfile(cached);
     setProfileError(null);
     setPaymentError(null);
-    setAnalysisPaid(cached != null);
+    setAnalysisPaid(cached != null || isFree);
   }, [wallet?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Auto-fetch profile when already paid (via localStorage or own wallet) but profile not yet loaded */
+  useEffect(() => {
+    if (!wallet || !analysisPaid || profile || loadingProfile) return;
+    fetchFullAnalysis(wallet.id);
+  }, [analysisPaid, wallet?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Handle payment to unlock analysis + network */
   const handlePayForAnalysis = useCallback(async () => {
