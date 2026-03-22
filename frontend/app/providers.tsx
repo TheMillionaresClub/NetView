@@ -3,38 +3,36 @@
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import { useEffect, useState } from "react";
 
-function getManifestUrl() {
-  // NEXT_PUBLIC_APP_URL takes priority if set
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (envUrl) return `${envUrl}/tonconnect-manifest.json`;
-
-  // Derive absolute URL from window.location at runtime
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/tonconnect-manifest.json`;
-  }
-
-  // SSR fallback — will be replaced on hydration
-  return "/tonconnect-manifest.json";
-}
-
-function getTwaReturnUrl(): `${string}://${string}` | undefined {
-  if (typeof window === "undefined") return undefined;
-  const tg = (window as any).Telegram?.WebApp;
-  if (!tg) return undefined;
-  // Build a tg:// return URL so the wallet app redirects back to this mini app
-  // window.location.origin gives us the base URL of the mini app
-  return `${window.location.origin}/` as `${string}://${string}`;
-}
-
+/**
+ * Defer rendering TonConnectUIProvider until we're on the client so the SDK
+ * is never initialized with a relative/empty manifest URL.
+ */
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const [manifestUrl, setManifestUrl] = useState(getManifestUrl);
+  const [ready, setReady] = useState(false);
+  const [manifestUrl, setManifestUrl] = useState("");
   const [twaReturn, setTwaReturn] = useState<`${string}://${string}` | undefined>(undefined);
 
   useEffect(() => {
-    // Re-derive on client to ensure absolute URL after hydration
-    setManifestUrl(getManifestUrl());
-    setTwaReturn(getTwaReturnUrl());
+    // Absolute manifest URL — NEXT_PUBLIC_APP_URL if set, otherwise derive from
+    // the browser URL (works for ngrok / vercel / any host).
+    const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    setManifestUrl(`${base}/tonconnect-manifest.json`);
+
+    // If running inside a Telegram mini-app, set the return URL so the wallet
+    // redirects back after approval.
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg) {
+      setTwaReturn(`${window.location.origin}/` as `${string}://${string}`);
+    }
+
+    setReady(true);
   }, []);
+
+  // Render children without TonConnect wrapper during SSR / before hydration.
+  // This prevents the SDK from initializing with a bad manifest URL.
+  if (!ready) {
+    return <>{children}</>;
+  }
 
   return (
     <TonConnectUIProvider
