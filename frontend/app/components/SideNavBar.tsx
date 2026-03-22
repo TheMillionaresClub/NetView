@@ -11,7 +11,7 @@ const navItems = [
   { icon: "account_balance_wallet", label: "Wallet", href: "/wallet/search" },
 ];
 
-export default function SideNavBar() {
+export default function SideNavBar({ open, onClose }: { open?: boolean; onClose?: () => void }) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
@@ -20,7 +20,20 @@ export default function SideNavBar() {
   };
 
   return (
-    <nav className="hidden sm:flex fixed left-0 top-14 bottom-0 w-20 flex-col items-center py-4 z-40 bg-[#0B0E11] font-body tabular-nums">
+    <>
+      {/* Mobile overlay backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[45] sm:hidden"
+          onClick={onClose}
+        />
+      )}
+    <nav className={`
+      fixed left-0 top-14 bottom-0 w-20 flex-col items-center py-4 z-[46] bg-[#0B0E11] font-body tabular-nums
+      transition-transform duration-300 ease-in-out
+      sm:flex
+      ${open ? "flex translate-x-0" : "hidden sm:flex -translate-x-full sm:translate-x-0"}
+    `}>
       <div className="mb-8 text-center">
         <div className="text-[#00E5FF] font-black text-[10px] uppercase tracking-tighter mb-1">
           NetView
@@ -32,6 +45,7 @@ export default function SideNavBar() {
           <Link
             key={item.label}
             href={item.href}
+            onClick={onClose}
             className={
               isActive(item.href)
                 ? "bg-[#272A2E] text-[#00E5FF] border-l-2 border-[#00E5FF] w-full py-3 flex flex-col items-center gap-1 transition-all duration-200"
@@ -47,6 +61,7 @@ export default function SideNavBar() {
         <div className="flex-1" />
         <Link
           href="/settings"
+          onClick={onClose}
           className={
             isActive("/settings")
               ? "bg-[#272A2E] text-[#00E5FF] border-l-2 border-[#00E5FF] w-full py-3 flex flex-col items-center gap-1 transition-all duration-200"
@@ -60,5 +75,6 @@ export default function SideNavBar() {
         </Link>
       </div>
     </nav>
+    </>
   );
 }

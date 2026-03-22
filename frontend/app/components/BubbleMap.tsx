@@ -18,7 +18,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import DetailPanel, { type CounterpartyFlow } from "./DetailPanel";
+import DetailPanel, { type CounterpartyFlow, type WalletProfile } from "./DetailPanel";
 import { normalizeToBounceable } from "../utils/ton";
 
 import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
@@ -98,11 +98,12 @@ type NodeData = {
   walletInfo: WalletInfo;
   classification: string;
   selected: boolean;
+  isExpanded: boolean;
   onSelect: (w: WalletInfo) => void;
 };
 
 const PersonNode = ({ data }: { data: NodeData }) => {
-  const { radius, walletInfo, classification, selected, onSelect } = data;
+  const { radius, walletInfo, classification, selected, isExpanded, onSelect } = data;
   const t = theme(classification);
   const isCenter = walletInfo.isCenter;
 
@@ -130,6 +131,18 @@ const PersonNode = ({ data }: { data: NodeData }) => {
       {!isCenter && (
         <span className="text-[10px] opacity-75 font-mono mt-0.5 tracking-wide">
           {walletInfo.txCount} tx{walletInfo.txCount !== 1 ? "s" : ""}
+        </span>
+      )}
+
+      {/* Expand indicator */}
+      {!isCenter && !isExpanded && (
+        <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] bg-blue-500/80 text-white px-1.5 py-0.5 rounded-t font-bold tracking-wide leading-none">
+          +
+        </span>
+      )}
+      {!isCenter && isExpanded && (
+        <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] bg-green-500/80 text-white px-1.5 py-0.5 rounded-t font-bold tracking-wide leading-none">
+          &#x2713;
         </span>
       )}
 
@@ -206,6 +219,28 @@ const CircleEdge = ({
    LOCAL STORAGE PERSISTENCE
 ================================================================ */
 const LS_KEY = "bubblemap-state-v2";
+const HISTORY_KEY = "bubblemap-history";
+
+interface HistoryEntry {
+  address: string;
+  label: string;
+  timestamp: number;
+  counterpartyCount: number;
+}
+
+function loadHistory(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveHistory(entries: HistoryEntry[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, 50))); // keep last 50
+  } catch { /* quota */ }
+}
 
 type SavedState = {
   nodePositions: Record<string, { x: number; y: number }>;
@@ -410,6 +445,38 @@ export default function BubbleMap({
     setProfileCache(prev => new Map(prev).set(address, profile));
   }, []);
 
+  /** Track which expanded wallet originated each edge: edgeId -> originAddr */
+  const [edgeOriginMap, setEdgeOriginMap] = useState<Map<string, string>>(new Map());
+  /** Filter: focus on a single expanded wallet's sub-network (null = show all) */
+  const [focusWallet, setFocusWallet] = useState<string | null>(null);
+  /** Filter: which classifications are visible (empty = all visible) */
+  const [classFilter, setClassFilter] = useState<Set<string>>(new Set());
+  /** Filter panel open/close */
+  const [filterOpen, setFilterOpen] = useState(false);
+  /** History panel open/close */
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  /** Tracking history */
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+
+  const addToHistory = useCallback((address: string, label: string, counterpartyCount: number) => {
+    setHistory(prev => {
+      // Deduplicate: remove old entry for same address, then prepend
+      const filtered = prev.filter(h => h.address !== address);
+      const updated = [{ address, label, timestamp: Date.now(), counterpartyCount }, ...filtered].slice(0, 50);
+      saveHistory(updated);
+      return updated;
+    });
+  }, []);
+
+  const removeFromHistory = useCallback((address: string) => {
+    setHistory(prev => {
+      const updated = prev.filter(h => h.address !== address);
+      saveHistory(updated);
+      return updated;
+    });
+  }, []);
+
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
   const [tonConnectUI] = useTonConnectUI();
@@ -483,7 +550,7 @@ export default function BubbleMap({
         type: 'circle',
         animated: true,
         label,
-        data: { txCount: cp.txCount, volumeTON: nanoToTON(cp.sentNano + cp.receivedNano) },
+        data: { txCount: cp.txCount, volumeTON: nanoToTON(cp.sentNano + cp.receivedNano), origin: originAddr },
         style: { stroke: color, strokeWidth: 2.5 },
         markerEnd: {
           type: MarkerType.Arrow,
@@ -514,6 +581,9 @@ export default function BubbleMap({
     setWalletBalances(new Map());
     setCenterAddr("");
     setError(null);
+    setEdgeOriginMap(new Map());
+    setFocusWallet(null);
+    setClassFilter(new Set());
     localStorage.removeItem(LS_KEY);
   }, [setNodes, setEdges]);
 
@@ -663,6 +733,13 @@ export default function BubbleMap({
       return [...prevEdges, ...toAdd];
     });
 
+    // Track which expanded wallet originated each edge
+    setEdgeOriginMap((prev) => {
+      const next = new Map(prev);
+      for (const e of newEdges) next.set(e.id, canonAddr);
+      return next;
+    });
+
     // Store counterparty flow data
     setCounterpartyMap((prev) => {
       const next = new Map(prev);
@@ -687,11 +764,36 @@ export default function BubbleMap({
     setLoading(false);
   }, [fetchFullAnalysis, buildEdges, setNodes, setEdges]);
 
-  /* -- Handle expanding a secondary wallet's network -- */
+  /* -- Handle expanding a secondary wallet's network (simple expand) -- */
   const handleExpand = useCallback(async (address: string) => {
     if (expandedAddresses.includes(address)) return;
     await loadFromFullAnalysis(address, false);
-  }, [expandedAddresses, loadFromFullAnalysis]);
+    addToHistory(address, shortAddr(address), 0);
+  }, [expandedAddresses, loadFromFullAnalysis, addToHistory]);
+
+  /** Clear old expansions and focus on a specific wallet */
+  const handleExpandClearAndFocus = useCallback(async (address: string) => {
+    // Clear the graph but keep center, reload center + new wallet
+    clearGraph();
+    if (activeAddress) {
+      lastLoadedRef.current = "";
+      await loadFromFullAnalysis(activeAddress, true);
+    }
+    await loadFromFullAnalysis(address, false);
+    addToHistory(address, shortAddr(address), 0);
+  }, [clearGraph, activeAddress, loadFromFullAnalysis, addToHistory]);
+
+  /** Keep existing expansions and add a wallet on top */
+  const handleExpandKeepExisting = useCallback(async (address: string) => {
+    await loadFromFullAnalysis(address, false);
+    addToHistory(address, shortAddr(address), 0);
+  }, [loadFromFullAnalysis, addToHistory]);
+
+  /** Load a wallet from history as a new center */
+  const loadFromHistory = useCallback(async (address: string) => {
+    setHistoryOpen(false);
+    setManualAddress(address);
+  }, [setManualAddress]);
 
   /* -- Initial load when activeAddress changes -- */
   useEffect(() => {
@@ -720,6 +822,7 @@ export default function BubbleMap({
     // Clear and load fresh
     clearGraph();
     loadFromFullAnalysis(activeAddress, true);
+    addToHistory(activeAddress, shortAddr(activeAddress), 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAddress]);
 
@@ -735,15 +838,20 @@ export default function BubbleMap({
     handleSelectNode(wallet);
   }, [setSearchTerm, handleSelectNode]);
 
-  /* -- Update selected state on nodes -- */
+  /* -- Update selected & expanded state on nodes -- */
   useEffect(() => {
     setNodes((nds: any[]) =>
       nds.map((n: any) => ({
         ...n,
-        data: { ...n.data, selected: selected?.id === n.id, onSelect: (w: WalletInfo) => setSelected(w) },
+        data: {
+          ...n.data,
+          selected: selected?.id === n.id,
+          isExpanded: expandedAddresses.includes(n.id),
+          onSelect: (w: WalletInfo) => setSelected(w),
+        },
       }))
     );
-  }, [selected, setNodes]);
+  }, [selected, expandedAddresses, setNodes]);
 
   /* -- Force layout: realign nodes to avoid overlap -- */
   const handleRealign = useCallback(() => {
@@ -760,9 +868,151 @@ export default function BubbleMap({
     }
   }, [nodes, edges, expandedAddresses, activeAddress]);
 
+  /* -- Computed: filtered nodes & edges -- */
+  const ALL_CLASSES = ["whale", "trader", "degen", "investor"];
+  const hasClassFilter = classFilter.size > 0;
+
+  const filteredEdges = useMemo(() => {
+    let result = edges;
+    // Focus filter: show only edges from this expanded wallet
+    if (focusWallet) {
+      result = result.filter((e: any) => {
+        const origin = edgeOriginMap.get(e.id) ?? (e.data as any)?.origin;
+        return origin === focusWallet;
+      });
+    }
+    return result;
+  }, [edges, focusWallet, edgeOriginMap]);
+
+  const filteredNodes = useMemo(() => {
+    let result = nodes;
+
+    // Focus filter: show only center node + the focused wallet + its connected counterparties
+    if (focusWallet) {
+      const connectedIds = new Set<string>();
+      connectedIds.add(focusWallet);
+      // Also keep center node
+      if (centerAddr) connectedIds.add(centerAddr);
+      for (const e of filteredEdges) {
+        connectedIds.add(e.source as string);
+        connectedIds.add(e.target as string);
+      }
+      result = result.filter((n: any) => connectedIds.has(n.id));
+    }
+
+    // Classification filter
+    if (hasClassFilter) {
+      result = result.filter((n: any) => {
+        const cls = (n.data as any)?.classification;
+        if (cls === "center") return true; // always show center
+        return classFilter.has(cls);
+      });
+    }
+
+    return result;
+  }, [nodes, focusWallet, centerAddr, filteredEdges, hasClassFilter, classFilter]);
+
+  // Also re-filter edges to only include those with both endpoints visible
+  const visibleEdges = useMemo(() => {
+    const visibleIds = new Set(filteredNodes.map((n: any) => n.id));
+    return filteredEdges.filter((e: any) => visibleIds.has(e.source as string) && visibleIds.has(e.target as string));
+  }, [filteredNodes, filteredEdges]);
+
+  const toggleClassFilter = useCallback((cls: string) => {
+    setClassFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(cls)) next.delete(cls);
+      else next.add(cls);
+      return next;
+    });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFocusWallet(null);
+    setClassFilter(new Set());
+  }, []);
+
   return (
     <>
-      <main className="fixed left-0 sm:left-20 right-0 top-24 bottom-0 overflow-hidden"
+      {/* History panel (slide-out) */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-[90] flex">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" onClick={() => setHistoryOpen(false)} />
+          {/* Panel */}
+          <div className="relative ml-auto w-full sm:w-80 h-full bg-[#0a1018] border-l border-slate-700 overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-[#0a1018] border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-300">Tracking History</h2>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="text-slate-500 hover:text-white text-lg transition-colors"
+              >
+                &times;
+              </button>
+            </div>
+            {history.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs text-slate-500">
+                No wallets tracked yet
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {history.map((entry) => {
+                  const isActive = entry.address === activeAddress;
+                  const dateStr = new Date(entry.timestamp).toLocaleDateString("en-US", {
+                    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                  });
+                  return (
+                    <div
+                      key={entry.address}
+                      className={`px-4 py-3 border-b border-slate-800 flex items-start gap-3 group transition-colors
+                        ${isActive ? "bg-blue-900/20" : "hover:bg-slate-800/50"}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          {isActive && (
+                            <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                          )}
+                          <span className="text-xs font-mono text-slate-300 truncate">
+                            {entry.label}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-mono text-slate-500 block truncate">
+                          {entry.address}
+                        </span>
+                        <span className="text-[9px] text-slate-600 mt-0.5 block">
+                          {dateStr}
+                        </span>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => loadFromHistory(entry.address)}
+                          title="Load as center wallet"
+                          className="px-2 py-1 text-[9px] font-bold uppercase rounded
+                                     bg-blue-600/80 border border-blue-400/40 text-white
+                                     hover:bg-blue-500 transition-all"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => removeFromHistory(entry.address)}
+                          title="Remove from history"
+                          className="px-2 py-1 text-[9px] font-bold rounded
+                                     bg-red-600/40 border border-red-500/40 text-red-300
+                                     hover:bg-red-600/60 transition-all"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <main className="fixed left-0 sm:left-20 right-0 top-[6.5rem] sm:top-24 bottom-0 overflow-hidden"
             style={{ background: "#080d14" }}>
 
         {loading && (
@@ -781,7 +1031,7 @@ export default function BubbleMap({
         )}
 
         {searchTerm.length > 0 && (
-          <div className="fixed top-28 right-20 z-50 w-72 bg-[#1a2535]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+          <div className="fixed top-28 left-2 right-2 sm:left-auto sm:right-20 z-50 sm:w-72 bg-[#1a2535]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
             {searchResults.length > 0 ? (
               searchResults.map((wallet) => {
                 const isExpanded = expandedAddresses.includes(wallet.id);
@@ -820,15 +1070,16 @@ export default function BubbleMap({
         )}
 
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={filteredNodes}
+          edges={visibleEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={(_, node) => {
             const wi = (node.data as any).walletInfo as WalletInfo;
-            if (wi) handleSelectNode(wi);
+            if (!wi) return;
+            handleSelectNode(wi);
           }}
           onPaneClick={() => setSelected(null)}
           fitView
@@ -838,18 +1089,118 @@ export default function BubbleMap({
           <Background color="#1a2535" gap={26} size={1} />
           <Controls />
 
-          {/* Realign button */}
+          {/* Realign + History buttons */}
           <Panel position="top-left" style={{ marginTop: 8, marginLeft: 8 }}>
-            <button
-              onClick={handleRealign}
-              title="Auto-layout: spread overlapping nodes"
-              className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wide
-                         bg-blue-600/90 border border-blue-400/50 text-white rounded-lg
-                         hover:bg-blue-500 hover:border-blue-300 transition-all cursor-pointer
-                         backdrop-blur-sm shadow-lg"
-            >
-              &#x2728; Realign
-            </button>
+            <div className="flex gap-1.5 sm:gap-2">
+              <button
+                onClick={handleRealign}
+                title="Auto-layout: spread overlapping nodes"
+                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wide
+                           bg-blue-600/90 border border-blue-400/50 text-white rounded-lg
+                           hover:bg-blue-500 hover:border-blue-300 transition-all cursor-pointer
+                           backdrop-blur-sm shadow-lg"
+              >
+                <span className="hidden sm:inline">&#x2728;</span> Realign
+              </button>
+              <button
+                onClick={() => setHistoryOpen(true)}
+                title="View tracking history"
+                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wide
+                           bg-slate-700/90 border border-slate-500/50 text-slate-200 rounded-lg
+                           hover:bg-slate-600 hover:border-slate-400 transition-all cursor-pointer
+                           backdrop-blur-sm shadow-lg"
+              >
+                <span className="hidden sm:inline">&#x1F4CB;</span> History{history.length > 0 ? ` (${history.length})` : ""}
+              </button>
+            </div>
+          </Panel>
+
+          {/* Filter panel */}
+          <Panel position="top-right" style={{ marginTop: 8, marginRight: 8 }}>
+            <div className="flex flex-col gap-2">
+              {/* Filter toggle button */}
+              <button
+                onClick={() => setFilterOpen(o => !o)}
+                className={`flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-wide rounded-lg
+                           transition-all cursor-pointer backdrop-blur-sm shadow-lg border
+                           ${(focusWallet || hasClassFilter)
+                             ? "bg-orange-600/90 border-orange-400/50 text-white"
+                             : "bg-slate-700/90 border-slate-500/50 text-slate-200 hover:bg-slate-600"}`}
+              >
+                <span className="hidden sm:inline">&#x1F50D;</span> Filter {(focusWallet || hasClassFilter) ? "(active)" : ""}
+              </button>
+
+              {filterOpen && (
+                <div className="bg-[#0f1923]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl p-3 w-[calc(100vw-24px)] sm:w-64 max-w-[280px] text-white">
+                  {/* Focus wallet dropdown */}
+                  <div className="mb-3">
+                    <label className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1 font-bold">
+                      Focus on Wallet
+                    </label>
+                    <select
+                      value={focusWallet ?? "__all__"}
+                      onChange={(e) => setFocusWallet(e.target.value === "__all__" ? null : e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-white focus:border-blue-400 outline-none"
+                    >
+                      <option value="__all__">All wallets</option>
+                      {expandedAddresses.map((addr) => (
+                        <option key={addr} value={addr}>
+                          {addr === centerAddr ? "Center" : shortAddr(addr)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Classification filter */}
+                  <div className="mb-3">
+                    <label className="block text-[10px] uppercase tracking-widest text-slate-400 mb-1.5 font-bold">
+                      Classification
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ALL_CLASSES.map((cls) => {
+                        const isActive = !hasClassFilter || classFilter.has(cls);
+                        const colors: Record<string, string> = {
+                          whale: "bg-purple-600/80 border-purple-400",
+                          trader: "bg-blue-600/80 border-blue-400",
+                          degen: "bg-green-600/80 border-green-400",
+                          investor: "bg-cyan-600/80 border-cyan-400",
+                        };
+                        return (
+                          <button
+                            key={cls}
+                            onClick={() => toggleClassFilter(cls)}
+                            className={`px-2 py-1 text-[10px] font-bold uppercase rounded border transition-all
+                              ${isActive
+                                ? `${colors[cls]} text-white`
+                                : "bg-slate-800/50 border-slate-600 text-slate-500"}`}
+                          >
+                            {cls}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="text-[10px] text-slate-400 mb-2">
+                    Showing {filteredNodes.length} of {nodes.length} nodes
+                    {" \u2022 "}{visibleEdges.length} of {edges.length} edges
+                  </div>
+
+                  {/* Clear filters */}
+                  {(focusWallet || hasClassFilter) && (
+                    <button
+                      onClick={clearFilters}
+                      className="w-full py-1.5 text-[10px] font-bold uppercase tracking-wide rounded
+                                 bg-red-600/30 border border-red-500/40 text-red-300
+                                 hover:bg-red-600/50 transition-all"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </Panel>
         </ReactFlow>
       </main>
@@ -877,7 +1228,10 @@ export default function BubbleMap({
         centerAddress={centerAddr || userAddress || null}
         walletBalance={selected ? (walletBalances.get(selected.id) ?? null) : null}
         onExpand={handleExpand}
+        onExpandClearAndFocus={handleExpandClearAndFocus}
+        onExpandKeepExisting={handleExpandKeepExisting}
         isExpanded={selected ? expandedAddresses.includes(selected.id) : false}
+        hasOtherExpansions={expandedAddresses.length > 1}
         cachedProfile={selected ? (profileCache.get(selected.id) ?? null) : null}
         onProfileFetched={handleProfileFetched}
       />
