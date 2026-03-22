@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 // Manifest hosted on GitHub (always reachable, no ngrok interstitial).
 // If you move to production with a real domain, switch back to a self-hosted URL.
 const GITHUB_MANIFEST_URL =
-  "https://raw.githubusercontent.com/theshadow76/public-data/main/epfl/hackathons/2026/NetView/tonconnect-manifest.json";
+  "https://gist.githubusercontent.com/theshadow76/69d6e474d2ed3906cfd92f2408da6781/raw/tonconnect-manifest.json";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
