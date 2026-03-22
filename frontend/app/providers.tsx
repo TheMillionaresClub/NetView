@@ -1,32 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 
 /**
- * Serve the TonConnect manifest from our own API route so the `url` field
- * always matches the current app origin (works with localhost, ngrok, prod).
+ * TonConnect manifest URL.
  *
- * We wait for the client-side mount before rendering TonConnectUIProvider so
- * the provider only initialises once with the correct manifest URL.  The old
- * approach (render with a gist fallback, then re-mount via key change) caused
- * a double-initialisation that destroyed the in-flight deep-link connection
- * flow on mobile wallets.
+ * The wallet's backend fetches this URL server-side to read the app metadata.
+ * When the app is behind ngrok (free tier), the dynamic `/api/tonconnect-manifest`
+ * endpoint returns ngrok's HTML interstitial instead of JSON, breaking the flow.
+ *
+ * Use NEXT_PUBLIC_TONCONNECT_MANIFEST_URL (a static, always-reachable gist)
+ * so that the wallet can always fetch it — regardless of tunnel / hosting.
  */
+const MANIFEST_URL =
+  process.env.NEXT_PUBLIC_TONCONNECT_MANIFEST_URL ??
+  "https://gist.githubusercontent.com/theshadow76/69d6e474d2ed3906cfd92f2408da6781/raw/tonconnect-manifest.json";
+
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const [manifestUrl, setManifestUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    setManifestUrl(`${window.location.origin}/api/tonconnect-manifest`);
-  }, []);
-
-  // Don't render the provider until we know the real origin —
-  // a single mount prevents the deep-link interruption on mobile.
-  if (!manifestUrl) return null;
-
   return (
     <TonConnectUIProvider
-      manifestUrl={manifestUrl}
+      manifestUrl={MANIFEST_URL}
       actionsConfiguration={{
         // After the wallet app signs, tell it to navigate back to the browser.
         // "back" works for both regular mobile browsers and Telegram WebView.
