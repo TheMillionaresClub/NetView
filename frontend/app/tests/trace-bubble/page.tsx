@@ -346,7 +346,7 @@ export default function TraceBubblePage() {
         maxDepth: String(maxDepth),
         txLimit: String(txLimit),
       });
-      const resp = await fetch(`http://localhost:3001/api/trace-link?${params}`);
+      const resp = await fetch(`${API}/api/trace-link?${params}`);
       if (!resp.ok) throw new Error(`API ${resp.status}: ${await resp.text()}`);
       setResult(await resp.json());
     } catch (e: any) {

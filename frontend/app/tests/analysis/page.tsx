@@ -81,7 +81,9 @@ interface WalletProfile {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const API = "http://localhost:3001";
+import { API_BASE } from "../../utils/api";
+
+const API = API_BASE;
 
 function nanoToTon(nano: string | number): string {
   return (Number(nano) / 1e9).toFixed(4);

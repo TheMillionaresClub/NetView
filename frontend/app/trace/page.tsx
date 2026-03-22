@@ -71,7 +71,9 @@ function nanoToTon(n: number) {
   return (Math.abs(n) / 1e9).toFixed(4);
 }
 
-const API = "http://localhost:3001";
+import { API_BASE } from "../utils/api";
+
+const API = API_BASE;
 
 // ── Custom Node ──────────────────────────────────────────────────
 function WalletNode({ data }: { data: any }) {

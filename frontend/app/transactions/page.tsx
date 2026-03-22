@@ -5,8 +5,10 @@ import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-rea
 import TopNavBar from "../components/TopNavBar";
 import SideNavBar from "../components/SideNavBar";
 
+import { API_BASE } from "../utils/api";
+
 const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
-const EXPRESS_API = "http://localhost:3001";
+const EXPRESS_API = API_BASE;
 
 // ── Types matching the Rust Transaction struct ───────────────────
 interface Transaction {

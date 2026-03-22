@@ -27,7 +27,9 @@ function formatDate(unix: number) {
   return new Date(unix * 1000).toLocaleString();
 }
 
-const API = "http://localhost:3001";
+import { API_BASE } from "../../utils/api";
+
+const API = API_BASE;
 
 // ── Page ─────────────────────────────────────────────────────────
 export default function TransactionsTestPage() {
