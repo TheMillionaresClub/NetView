@@ -219,6 +219,28 @@ const CircleEdge = ({
    LOCAL STORAGE PERSISTENCE
 ================================================================ */
 const LS_KEY = "bubblemap-state-v2";
+const HISTORY_KEY = "bubblemap-history";
+
+interface HistoryEntry {
+  address: string;
+  label: string;
+  timestamp: number;
+  counterpartyCount: number;
+}
+
+function loadHistory(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveHistory(entries: HistoryEntry[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, 50))); // keep last 50
+  } catch { /* quota */ }
+}
 
 type SavedState = {
   nodePositions: Record<string, { x: number; y: number }>;
@@ -431,6 +453,31 @@ export default function BubbleMap({
   const [classFilter, setClassFilter] = useState<Set<string>>(new Set());
   /** Filter panel open/close */
   const [filterOpen, setFilterOpen] = useState(false);
+  /** History panel open/close */
+  const [historyOpen, setHistoryOpen] = useState(false);
+  /** Expand confirmation dialog */
+  const [expandConfirm, setExpandConfirm] = useState<{ address: string; label: string } | null>(null);
+
+  /** Tracking history */
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+
+  const addToHistory = useCallback((address: string, label: string, counterpartyCount: number) => {
+    setHistory(prev => {
+      // Deduplicate: remove old entry for same address, then prepend
+      const filtered = prev.filter(h => h.address !== address);
+      const updated = [{ address, label, timestamp: Date.now(), counterpartyCount }, ...filtered].slice(0, 50);
+      saveHistory(updated);
+      return updated;
+    });
+  }, []);
+
+  const removeFromHistory = useCallback((address: string) => {
+    setHistory(prev => {
+      const updated = prev.filter(h => h.address !== address);
+      saveHistory(updated);
+      return updated;
+    });
+  }, []);
 
   const nodeTypes = useMemo(() => ({ person: PersonNode }), []);
   const edgeTypes = useMemo(() => ({ circle: CircleEdge }), []);
@@ -722,8 +769,44 @@ export default function BubbleMap({
   /* -- Handle expanding a secondary wallet's network -- */
   const handleExpand = useCallback(async (address: string) => {
     if (expandedAddresses.includes(address)) return;
+    // If there are already expanded wallets beyond center, ask user
+    if (expandedAddresses.length > 1) {
+      setExpandConfirm({ address, label: shortAddr(address) });
+      return;
+    }
     await loadFromFullAnalysis(address, false);
-  }, [expandedAddresses, loadFromFullAnalysis]);
+    addToHistory(address, shortAddr(address), 0);
+  }, [expandedAddresses, loadFromFullAnalysis, addToHistory]);
+
+  /** Confirm expand: clear old expansions and focus on this wallet */
+  const handleExpandClearAndFocus = useCallback(async () => {
+    if (!expandConfirm) return;
+    const { address, label } = expandConfirm;
+    setExpandConfirm(null);
+    // Clear the graph but keep center, reload center + new wallet
+    clearGraph();
+    if (activeAddress) {
+      lastLoadedRef.current = "";
+      await loadFromFullAnalysis(activeAddress, true);
+    }
+    await loadFromFullAnalysis(address, false);
+    addToHistory(address, label, 0);
+  }, [expandConfirm, clearGraph, activeAddress, loadFromFullAnalysis, addToHistory]);
+
+  /** Confirm expand: keep existing and add on top */
+  const handleExpandKeepExisting = useCallback(async () => {
+    if (!expandConfirm) return;
+    const { address, label } = expandConfirm;
+    setExpandConfirm(null);
+    await loadFromFullAnalysis(address, false);
+    addToHistory(address, label, 0);
+  }, [expandConfirm, loadFromFullAnalysis, addToHistory]);
+
+  /** Load a wallet from history as a new center */
+  const loadFromHistory = useCallback(async (address: string) => {
+    setHistoryOpen(false);
+    setManualAddress(address);
+  }, [setManualAddress]);
 
   /* -- Initial load when activeAddress changes -- */
   useEffect(() => {
@@ -752,6 +835,7 @@ export default function BubbleMap({
     // Clear and load fresh
     clearGraph();
     loadFromFullAnalysis(activeAddress, true);
+    addToHistory(activeAddress, shortAddr(activeAddress), 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAddress]);
 
