@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  devIndicators: false,
   async rewrites() {
     const apiUrl = process.env.EXPRESS_API_URL ?? "http://localhost:3001";
     return [
