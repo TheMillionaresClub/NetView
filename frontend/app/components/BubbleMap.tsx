@@ -528,10 +528,11 @@ export default function BubbleMap({
   const [activeAddress, setActiveAddress] = useState<string>("");
   const lastLoadedRef = useRef<string>("");
 
-  // Normalize the raw address
+  // Normalize the raw address; reset lastLoadedRef so main effect re-evaluates
   useEffect(() => {
     const raw = manualAddress || userAddress || "";
-    if (!raw) { setActiveAddress(""); return; }
+    if (!raw) { setActiveAddress(""); lastLoadedRef.current = ""; return; }
+    lastLoadedRef.current = ""; // reset so main effect always re-runs on address change
     normalizeToBounceable(raw).then(setActiveAddress);
   }, [manualAddress, userAddress]);
 
@@ -814,7 +815,7 @@ const searchResults = knownWallets.filter((w) =>
   const loadNetworkWithPayment = useCallback(async (
     address: string,
     isCenter: boolean,
-    boc: string,
+    boc: string | null,   // null = free (own wallet, no payment required)
     queryId: string,
     fromAddress: string,
     network: string,
@@ -822,16 +823,15 @@ const searchResults = knownWallets.filter((w) =>
     setLoading(true);
     setError(null);
     try {
-      const payloadObj = { scheme: "ton-v1", network, boc, fromAddress, queryId };
-      const paymentSig = btoa(JSON.stringify(payloadObj));
+      const fetchOptions: RequestInit = {};
+      if (boc) {
+        const payloadObj = { scheme: "ton-v1", network, boc, fromAddress, queryId };
+        fetchOptions.headers = { "PAYMENT-SIGNATURE": btoa(JSON.stringify(payloadObj)) };
+      }
 
       const res = await fetch(
         `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`,
-        {
-          headers: {
-            "PAYMENT-SIGNATURE": paymentSig,
-          },
-        }
+        fetchOptions
       );
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const json = await res.json();
@@ -1005,13 +1005,20 @@ const searchResults = knownWallets.filter((w) =>
     // Always clear graph first
     clearGraph();
 
-    const isOwnWallet = normalizedUserAddress && activeAddress === normalizedUserAddress;
-    // Use manualAddress directly (not normalizedManualAddress which is set async and may not be ready yet)
+    // Synchronous check: if no manualAddress and userAddress is connected,
+    // activeAddress is always the connected wallet (both normalize the same input)
+    const isOwnWallet = !manualAddress && !!userAddress;
     const isManual = !!manualAddress;
 
     if (isOwnWallet && !isManual) {
-      // Show center bubble labeled "You" — no payment gate
-      showCenterBubble(activeAddress, "You");
+      // Load own wallet's network for free (no payment required)
+      const cached = networkDataCacheRef.current.get(activeAddress);
+      if (cached) {
+        applyNetworkData(activeAddress, true, cached);
+      } else {
+        loadNetworkWithPayment(activeAddress, true, null, "", "", currentNetwork)
+          .catch(() => showCenterBubble(activeAddress, "You")); // fallback on API error
+      }
       return;
     }
 
@@ -1040,7 +1047,7 @@ const searchResults = knownWallets.filter((w) =>
     // Fallback: just show center bubble
     showCenterBubble(activeAddress, shortAddr(activeAddress));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAddress, manualAddress]);
+  }, [activeAddress, manualAddress, userAddress, currentNetwork]);
 
   /* -- Click a node: just select it -- */
   const handleSelectNode = useCallback((walletInfo: WalletInfo) => {
@@ -1469,6 +1476,7 @@ const searchResults = knownWallets.filter((w) =>
       </main>
 
       <DetailPanel
+        key={selected?.id ?? "none"}
         wallet={selected ? {
           id: selected.id,
           name: selected.label,

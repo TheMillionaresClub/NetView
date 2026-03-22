@@ -190,8 +190,14 @@ export default function DetailPanel({
   // Payment state
   const [paymentPending, setPaymentPending] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  // analysisPaid: true if this wallet has been paid for in this panel session
-  const [analysisPaid, setAnalysisPaid] = useState<boolean>(cachedProfile != null);
+  // Own wallet never requires payment
+  const isOwnWallet = !!userAddress && !!wallet && wallet.id === userAddress;
+  // analysisPaid: true if cached, already paid this session, or it's the user's own wallet
+  const [analysisPaid, setAnalysisPaid] = useState<boolean>(cachedProfile != null || isOwnWallet);
+  // Sync in case userAddress resolves async after initial render
+  useEffect(() => {
+    if (isOwnWallet) setAnalysisPaid(true);
+  }, [isOwnWallet]);
 
   /* Fetch full on-chain profile (no payment needed for analysis endpoint) */
   const fetchFullAnalysis = useCallback(async (address: string) => {

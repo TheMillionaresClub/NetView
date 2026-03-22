@@ -16,6 +16,16 @@ import {
 import "@xyflow/react/dist/style.css";
 import TopNavBar from "../components/TopNavBar";
 import SideNavBar from "../components/SideNavBar";
+import { useTonConnectUI, useTonAddress, useTonWallet } from "@tonconnect/ui-react";
+
+const PAYMENT_ADDRESS = "0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_";
+
+function traceCostNano(depth: number): number {
+  return Math.pow(2, depth) * 10_000_000; // 2^depth × 0.01 TON in nanotons
+}
+function traceCostDisplay(depth: number): string {
+  return (Math.pow(2, depth) * 0.01).toFixed(2);
+}
 
 // ── Types ────────────────────────────────────────────────────────
 interface PathStep {
@@ -168,6 +178,12 @@ export default function TracePage() {
   const [balances, setBalances] = useState<Record<string, WalletBalance>>({});
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  const [tonConnectUI] = useTonConnectUI();
+  const userAddress = useTonAddress();
+  const wallet = useTonWallet();
+  const [paymentPending, setPaymentPending] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
   const fetchBalance = useCallback(async (address: string) => {
     try {
       const resp = await fetch(
@@ -204,10 +220,7 @@ export default function TracePage() {
     setProgress(null);
   }, []);
 
-  const findConnection = useCallback(() => {
-    if (!walletA.trim() || !walletB.trim()) return;
-
-    // Clean up previous
+  const runSearch = useCallback((paymentSig: string) => {
     cancelSearch();
     setError(null);
     setResult(null);
@@ -219,11 +232,10 @@ export default function TracePage() {
       wallet_a: walletA.trim(),
       wallet_b: walletB.trim(),
       max_depth: String(maxDepth),
+      payment_signature: paymentSig,
     });
 
-    const es = new EventSource(
-      `${API}/api/wallet-connection/stream?${params}`
-    );
+    const es = new EventSource(`${API}/api/wallet-connection/stream?${params}`);
     eventSourceRef.current = es;
 
     es.addEventListener("progress", (e: MessageEvent) => {
@@ -262,6 +274,28 @@ export default function TracePage() {
       setProgress(null);
     });
   }, [walletA, walletB, maxDepth, cancelSearch, fetchAllBalances]);
+
+  const findConnection = useCallback(async () => {
+    if (!walletA.trim() || !walletB.trim()) return;
+    setPaymentPending(true);
+    setPaymentError(null);
+    try {
+      const amountNano = String(Math.floor(traceCostNano(maxDepth)));
+      const tx = await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 600,
+        messages: [{ address: PAYMENT_ADDRESS, amount: amountNano }],
+      });
+      const queryId = Date.now().toString();
+      const network = wallet?.account?.chain ?? "-239";
+      const payloadObj = { scheme: "ton-v1", network, boc: tx.boc, fromAddress: userAddress || "", queryId };
+      const paymentSig = btoa(JSON.stringify(payloadObj));
+      runSearch(paymentSig);
+    } catch (err: any) {
+      setPaymentError(err.message ?? "Payment failed or cancelled");
+    } finally {
+      setPaymentPending(false);
+    }
+  }, [walletA, walletB, maxDepth, tonConnectUI, wallet, userAddress, runSearch]);
 
   // ── Build ReactFlow graph ────────────────────────────────────
   const { nodes, edges } = useMemo(() => {
@@ -388,12 +422,21 @@ export default function TracePage() {
             {!loading ? (
               <button
                 onClick={findConnection}
-                disabled={!walletA.trim() || !walletB.trim()}
+                disabled={!walletA.trim() || !walletB.trim() || paymentPending}
                 className="px-4 py-1.5 bg-primary-container text-on-primary-container
                            font-label font-semibold text-xs uppercase tracking-wider
-                           hover:brightness-110 disabled:opacity-40 transition h-[30px]"
+                           hover:brightness-110 disabled:opacity-40 transition h-[30px] flex items-center gap-1.5"
               >
-                Find Connection
+                {paymentPending ? (
+                  <>
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="60" strokeLinecap="round" />
+                    </svg>
+                    Paying…
+                  </>
+                ) : (
+                  <>Find Connection — {traceCostDisplay(maxDepth)} TON</>
+                )}
               </button>
             ) : (
               <button
@@ -500,6 +543,11 @@ export default function TracePage() {
           {error && (
             <div className="bg-error-container text-on-error-container px-3 py-2 text-xs">
               {error}
+            </div>
+          )}
+          {paymentError && (
+            <div className="bg-error-container text-on-error-container px-3 py-2 text-xs">
+              Payment failed: {paymentError}
             </div>
           )}
         </div>
