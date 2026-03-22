@@ -8,10 +8,10 @@ const PAGE_DELAY_MS = 600;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ── GET /api/wallet-transactions?address=...&limit=...&lt=...&hash=...
+// ── GET /api/wallet-transactions?address=...&limit=...&lt=...&hash=...&network=mainnet|testnet
 // Single page (up to 100 transactions), no payment required
 router.get("/", async (req, res) => {
-    const { address, limit, lt, hash } = req.query as Record<string, string>;
+    const { address, limit, lt, hash, network } = req.query as Record<string, string>;
 
     if (!address) {
         return res.status(400).json({ error: "Missing ?address= query parameter" });
@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
 
     try {
         const bg = await getWalletInfoWasm();
-        const result: any = await bg.get_transactions(address, pageSize, lt ?? null, hash ?? null, API_KEY);
+        const result: any = await bg.get_transactions(address, pageSize, lt ?? null, hash ?? null, API_KEY, network ?? null);
 
         return res.json({
             ok: true,
@@ -39,10 +39,10 @@ router.get("/", async (req, res) => {
     }
 });
 
-// ── GET /api/wallet-transactions/bulk?address=...&limit=...
+// ── GET /api/wallet-transactions/bulk?address=...&limit=...&network=mainnet|testnet
 // Paginated bulk fetch (up to 10,000 transactions), no payment required
 router.get("/bulk", async (req, res) => {
-    const { address, limit } = req.query as Record<string, string>;
+    const { address, limit, network } = req.query as Record<string, string>;
 
     if (!address) {
         return res.status(400).json({ error: "Missing ?address= query parameter" });
@@ -59,7 +59,7 @@ router.get("/bulk", async (req, res) => {
 
         while (fetched < totalLimit) {
             const pageSize = Math.min(totalLimit - fetched, PAGE_SIZE);
-            const result: any = await bg.get_transactions(address, pageSize, lt, hash, API_KEY);
+            const result: any = await bg.get_transactions(address, pageSize, lt, hash, API_KEY, network ?? null);
 
             const txs: unknown[] = result.transactions ?? [];
             if (txs.length > 0) {
@@ -88,10 +88,10 @@ router.get("/bulk", async (req, res) => {
     }
 });
 
-// ── GET /api/wallet-transactions/stream?address=...&limit=...
+// ── GET /api/wallet-transactions/stream?address=...&limit=...&network=mainnet|testnet
 // SSE stream, no payment required
 router.get("/stream", async (req, res) => {
-    const { address, limit } = req.query as Record<string, string>;
+    const { address, limit, network } = req.query as Record<string, string>;
 
     if (!address) {
         return res.status(400).json({ error: "Missing ?address= query parameter" });
@@ -117,7 +117,7 @@ router.get("/stream", async (req, res) => {
 
         while (fetched < totalLimit) {
             const pageSize = Math.min(totalLimit - fetched, PAGE_SIZE);
-            const result: any = await bg.get_transactions(address, pageSize, lt, hash, API_KEY);
+            const result: any = await bg.get_transactions(address, pageSize, lt, hash, API_KEY, network ?? null);
 
             const txs: unknown[] = result.transactions ?? [];
             if (txs.length > 0) {

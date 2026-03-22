@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useTonWallet } from "@tonconnect/ui-react";
 import TopNavBar from "./components/TopNavBar";
 import SideNavBar from "./components/SideNavBar";
 import BubbleMap from "./components/BubbleMap";
@@ -8,10 +9,18 @@ import BottomBar from "./components/BottomBar";
 import { normalizeToBounceable } from "./utils/ton";
 
 export default function Home() {
-  const [searchTerm, setSearchTerm]     = useState("");
+  const [searchTerm, setSearchTerm]       = useState("");
   const [manualAddress, setManualAddress] = useState("");
-  const [inputValue, setInputValue]     = useState("");
-  const [loading, setLoading]           = useState(false);
+  const [inputValue, setInputValue]       = useState("");
+  const [loading, setLoading]             = useState(false);
+  const [network, setNetwork]             = useState<"testnet" | "mainnet">("testnet");
+
+  // Auto-sync network from connected wallet chain, but allow manual override
+  const tonWallet = useTonWallet();
+  useEffect(() => {
+    if (!tonWallet?.account?.chain) return;
+    setNetwork(tonWallet.account.chain === "-239" ? "mainnet" : "testnet");
+  }, [tonWallet?.account?.chain]);
 
   const handleLoadWallet = async () => {
     const addr = inputValue.trim();
@@ -29,7 +38,12 @@ export default function Home() {
 
   return (
     <>
-      <TopNavBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+      <TopNavBar
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        network={network}
+        setNetwork={setNetwork}
+      />
       <SideNavBar />
 
       {/* Address bar */}
@@ -72,6 +86,7 @@ export default function Home() {
         setSearchTerm={setSearchTerm}
         manualAddress={manualAddress}
         setManualAddress={setManualAddress}
+        network={network}
       />
       <BottomBar />
     </>

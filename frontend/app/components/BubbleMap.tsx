@@ -451,11 +451,13 @@ export default function BubbleMap({
   setSearchTerm,
   manualAddress,
   setManualAddress,
+  network: networkProp,
 }: {
   searchTerm: string;
   setSearchTerm: (val: string) => void;
   manualAddress: string;
   setManualAddress: (val: string) => void;
+  network?: "testnet" | "mainnet";
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [nodes, setNodes, onNodesChange] = useNodesState([] as any[]);
@@ -523,7 +525,9 @@ export default function BubbleMap({
   const [tonConnectUI] = useTonConnectUI();
   const userAddress = useTonAddress();
   const tonWallet = useTonWallet();
-  const currentNetwork = tonWallet?.account?.chain === "-239" ? "mainnet" : "testnet";
+  // Use prop-driven network; fall back to wallet chain detection only if no prop
+  const walletChainNet = tonWallet?.account?.chain === "-239" ? "mainnet" : "testnet";
+  const currentNetwork = networkProp ?? walletChainNet;
 
   const [activeAddress, setActiveAddress] = useState<string>("");
   const lastLoadedRef = useRef<string>("");
@@ -830,7 +834,7 @@ const searchResults = knownWallets.filter((w) =>
       }
 
       const res = await fetch(
-        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50`,
+        `http://localhost:3001/api/wallet-network?address=${encodeURIComponent(address)}&limit=50&network=${currentNetwork}`,
         fetchOptions
       );
       if (!res.ok) throw new Error(`API error: ${res.status}`);

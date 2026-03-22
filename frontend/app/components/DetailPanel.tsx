@@ -862,7 +862,7 @@ export default function DetailPanel({
             className="dp-explorer-btn"
             onClick={() => {
               const tg = (window as any).Telegram?.WebApp;
-              const url = "https://testnet.tonscan.org/address/" + wallet.id;
+              const url = (network === "mainnet" ? "https://tonscan.org" : "https://testnet.tonscan.org") + "/address/" + wallet.id;
               if (tg) tg.openLink?.(url);
               else window.open(url, "_blank");
             }}

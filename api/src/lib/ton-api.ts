@@ -1,138 +1,97 @@
 /**
- * ton-api.ts  —  Shared helper for calling the toncenter HTTP API
- * Used by multiple routes (/wallet-info, /trace-link, etc.)
+ * ton-api.ts  —  Shared helper for transaction fetching via tonapi.io
+ * Uses tonapi v2 for both mainnet and testnet (same key works on both).
  */
 
-const DEFAULT_API_KEY =
-  process.env.RPC_API_KEY ??
-  "e251fe96771c8fe3e7c93798924a1b12c600aecfcc25d4b9fa9178ca15a9050d";
+const TONAPI_KEY = process.env.TONAPI_KEY ?? undefined;
 
-const TESTNET_URL = "https://testnet.toncenter.com/api/v2";
-const MAINNET_URL = "https://toncenter.com/api/v2";
+function tonapiBase(network?: string): string {
+    return (network ?? "testnet") === "mainnet"
+        ? "https://tonapi.io/v2"
+        : "https://testnet.tonapi.io/v2";
+}
 
-export function getBaseUrl(): string {
-  const net = (process.env.TON_NETWORK ?? "testnet").toLowerCase();
-  return net === "mainnet" ? MAINNET_URL : TESTNET_URL;
+export function getBaseUrl(network?: string): string {
+    return tonapiBase(network);
 }
 
 export function getApiKey(): string {
-  return DEFAULT_API_KEY;
-}
-
-/** Generic toncenter GET request */
-export async function toncenterGet(
-  method: string,
-  params: Record<string, string | number>
-): Promise<any> {
-  const base = getBaseUrl();
-  const key = getApiKey();
-  const qs = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null) qs.set(k, String(v));
-  }
-  const url = `${base}/${method}?${qs}`;
-  const resp = await fetch(url, {
-    headers: { "X-API-Key": key, Accept: "application/json" },
-  });
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => "");
-    throw new Error(`toncenter ${resp.status}: ${body.slice(0, 200)}`);
-  }
-  return resp.json();
+    return TONAPI_KEY ?? "";
 }
 
 // ─── Transaction helpers ──────────────────────────────────────────
 
 export interface TxMsg {
-  source: string;
-  destination: string;
-  value: string;
-  message?: string;
+    source: string;
+    destination: string;
+    value: string;
+    message?: string;
 }
 
 export interface Tx {
-  utime: number;
-  transaction_id: { lt: string; hash: string };
-  in_msg?: TxMsg;
-  out_msgs?: TxMsg[];
+    utime: number;
+    transaction_id: { lt: string; hash: string };
+    in_msg?: TxMsg;
+    out_msgs?: TxMsg[];
 }
 
 /**
- * Fetch up to `limit` transactions for an address.
- * Handles pagination automatically.
+ * Fetch up to `limit` transactions for an address via tonapi v2.
  */
 export async function getTransactions(
-  address: string,
-  limit: number = 50
+    address: string,
+    limit: number = 50,
+    network?: string,
 ): Promise<Tx[]> {
-  const all: Tx[] = [];
-  let lastLt: string | undefined;
-  let lastHash: string | undefined;
-  const pageSize = Math.min(limit, 50);
+    const base = tonapiBase(network);
+    const url = `${base}/blockchain/accounts/${encodeURIComponent(address)}/transactions?limit=${Math.min(limit, 256)}&sort_order=desc`;
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (TONAPI_KEY) headers["Authorization"] = `Bearer ${TONAPI_KEY}`;
 
-  while (all.length < limit) {
-    const params: Record<string, string | number> = {
-      address,
-      limit: pageSize,
-    };
-    if (lastLt) {
-      params.lt = lastLt;
-      params.hash = lastHash!;
+    const resp = await fetch(url, { headers });
+    if (resp.status === 404) return [];
+    if (!resp.ok) {
+        const body = await resp.text().catch(() => "");
+        throw new Error(`tonapi ${resp.status}: ${body.slice(0, 200)}`);
     }
 
-    let data: any;
-    try {
-      data = await toncenterGet("getTransactions", params);
-    } catch {
-      break; // pagination can fail on some hashes — return what we have
-    }
+    const data: any = await resp.json();
 
-    if (!data?.ok) break;
-    let txs: Tx[] = data.result ?? [];
-    if (!txs.length) break;
-
-    // Deduplicate overlap with previous page
-    if (lastLt && txs[0]?.transaction_id.lt === lastLt) {
-      txs = txs.slice(1);
-    }
-    if (!txs.length) break;
-
-    all.push(...txs);
-
-    const last = txs[txs.length - 1];
-    lastLt = last.transaction_id.lt;
-    lastHash = last.transaction_id.hash;
-
-    // Small delay to respect rate limits
-    await new Promise((r) => setTimeout(r, 200));
-  }
-
-  return all.slice(0, limit);
+    // Map tonapi format → the Tx interface wallet-network.ts expects
+    return (data.transactions ?? []).map((tx: any): Tx => ({
+        utime: tx.utime ?? 0,
+        transaction_id: {
+            lt: String(tx.lt ?? "0"),
+            hash: tx.hash ?? "",
+        },
+        in_msg: tx.in_msg
+            ? {
+                source: tx.in_msg.source?.address ?? "",
+                destination: address,
+                value: String(tx.in_msg.value ?? "0"),
+            }
+            : undefined,
+        out_msgs: (tx.out_msgs ?? []).map((m: any) => ({
+            source: address,
+            destination: m.destination?.address ?? "",
+            value: String(m.value ?? "0"),
+        })),
+    }));
 }
 
 /**
- * Extract unique addresses this wallet has interacted with
- * (both sent-to and received-from).
- * Returns a Set of address strings.
+ * Extract unique addresses this wallet has interacted with.
  */
 export function extractInteractedAddresses(
-  txs: Tx[],
-  selfAddress: string
+    txs: Tx[],
+    selfAddress: string,
 ): Set<string> {
-  const addrs = new Set<string>();
-
-  for (const tx of txs) {
-    // Incoming
-    if (tx.in_msg?.source && tx.in_msg.source !== selfAddress) {
-      addrs.add(tx.in_msg.source);
+    const addrs = new Set<string>();
+    for (const tx of txs) {
+        if (tx.in_msg?.source && tx.in_msg.source !== selfAddress) addrs.add(tx.in_msg.source);
+        for (const msg of tx.out_msgs ?? []) {
+            if (msg.destination && msg.destination !== selfAddress) addrs.add(msg.destination);
+        }
     }
-    // Outgoing
-    for (const msg of tx.out_msgs ?? []) {
-      if (msg.destination && msg.destination !== selfAddress) {
-        addrs.add(msg.destination);
-      }
-    }
-  }
-
-  return addrs;
+    return addrs;
 }

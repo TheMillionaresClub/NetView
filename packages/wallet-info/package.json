@@ -1,17 +1,11 @@
 {
   "name": "wallet-info",
-  "type": "module",
   "version": "0.1.0",
   "files": [
     "wallet_info_bg.wasm",
     "wallet_info.js",
-    "wallet_info_bg.js",
     "wallet_info.d.ts"
   ],
   "main": "wallet_info.js",
-  "types": "wallet_info.d.ts",
-  "sideEffects": [
-    "./wallet_info.js",
-    "./snippets/*"
-  ]
+  "types": "wallet_info.d.ts"
 }
