@@ -17,7 +17,11 @@ const MANIFEST_URL =
 function isTMA(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return !!((window as any).Telegram?.WebApp?.initData);
+    // Check for the Telegram WebApp object. Some versions have initData as
+    // an empty string even inside the mini-app, so checking for its existence
+    // (not truthiness) plus the WebApp object itself is more reliable.
+    const tg = (window as any).Telegram?.WebApp;
+    return !!(tg && typeof tg.initDataUnsafe === "object");
   } catch {
     return false;
   }
