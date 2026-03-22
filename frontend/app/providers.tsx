@@ -28,10 +28,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     setReady(true);
   }, []);
 
-  // Render children without TonConnect wrapper during SSR / before hydration.
-  // This prevents the SDK from initializing with a bad manifest URL.
+  // Don't render children until the provider is ready — child components use
+  // TonConnect hooks that crash without the provider in the tree.
   if (!ready) {
-    return <>{children}</>;
+    return null;
   }
 
   return (
