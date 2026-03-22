@@ -20,7 +20,25 @@
       "Bash(xargs grep:*)",
       "Bash(pnpm add:*)",
       "Bash(pnpm remove:*)",
-      "Bash(pnpm --filter @ton-x402/client build)"
+      "Bash(pnpm --filter @ton-x402/client build)",
+      "Bash(find /c/Users/ayfmp/Documents/projects/hackathon/bsa-ton/NetView -type f \\\\\\(-name *.test.* -o -name *.spec.* \\\\\\))",
+      "Bash(find /c/Users/ayfmp/Documents/projects/hackathon/bsa-ton/NetView -path ./node_modules -prune -o -type f \\\\\\(-name *.test.* -o -name *.spec.* -o -name *test* -o -name *spec* \\\\\\) -print)",
+      "Read(//c/Users/ayfmp/AppData/Local/Temp/claude/C--Users-ayfmp-Documents-projects-hackathon-bsa-ton-NetView/a9100a5b-4b5e-4a12-84b6-3a2ceb6516eb/tasks/**)",
+      "Bash(pnpm install:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://tonapi.io/v2/accounts/0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(curl -s -w \"\\\\n%{http_code}\" \"https://tonapi.io/v2/accounts/0QBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Ljy8_/events?limit=5\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(node -e \":*)",
+      "Bash(curl -s \"https://tonapi.io/v2/accounts/EQDhSi7yR6wwvdg3X_llvA_l_GDtdqs-kBiU4jiX0RBj2NoL/events?limit=5\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s https://tonapi.io/v2/accounts/EQDhSi7yR6wwvdg3X_llvA_l_GDtdqs-kBiU4jiX0RBj2NoL/events?limit=5 -H 'Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI')",
+      "Bash(curl -s \"https://tonapi.io/v2/accounts/EQBbtZtF0cYG5xj7JvpbUhHIkMqx3PhE4FVqAXJx9k-Lj8lw/events?limit=5\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(curl -s \"https://tonapi.io/v2/accounts/EQDhSi7yR6wwvdg3X_llvA_l_GDtdqs-kBiU4jiX0RBj2NoL\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(curl -s \"https://testnet.tonapi.io/v2/accounts/EQDhSi7yR6wwvdg3X_llvA_l_GDtdqs-kBiU4jiX0RBj2NoL/events?limit=5\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(curl -s \"https://testnet.tonapi.io/v2/accounts/kQDMo9xJIt6qMhYJg5IuhlK18XkRJVKUPe0grA0ORJoTgewC\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(curl -s \"https://testnet.tonapi.io/v2/accounts/kQDMo9xJIt6qMhYJg5IuhlK18XkRJVKUPe0grA0ORJoTgewC/events?limit=5\" -H \"Authorization: Bearer AHLI2ZJIIJEEPYIAAAAEOQECK7VYIGFBULU6YCXWPFRLU426LG4CDE6IHKP6BV5MRIVBEOI\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''events:'''', len\\(d.get\\(''''events'''',[]\\)\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "Bash(npx next:*)"
     ]
   }
 }

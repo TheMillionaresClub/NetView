@@ -1,0 +1,11 @@
+{
+  "name": "wallet-connection",
+  "version": "0.1.0",
+  "files": [
+    "wallet_connection_bg.wasm",
+    "wallet_connection.js",
+    "wallet_connection.d.ts"
+  ],
+  "main": "wallet_connection.js",
+  "types": "wallet_connection.d.ts"
+}
