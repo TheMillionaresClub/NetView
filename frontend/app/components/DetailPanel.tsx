@@ -235,12 +235,7 @@ export default function DetailPanel({
         setProfile(data.result);
         onProfileFetched?.(address, data.result);
       } else {
-        throw new Error(infoData.error ?? "Unknown error");
-      }
-
-      if (scraperRes.ok) {
-        const scraperData = await scraperRes.json();
-        if (scraperData.ok) setScraperProfile(scraperData.result);
+        throw new Error(data.error ?? "Unknown error");
       }
     } catch (err: any) {
       setProfileError(err.message ?? "Failed to fetch");
